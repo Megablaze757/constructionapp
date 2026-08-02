@@ -9,9 +9,14 @@ Parent: [BuilderOS system spec](../builderos-system-spec.md)
 
 | Document | Covers |
 | --- | --- |
-| This file | Why the module exists, components, data model, phased build plan |
+| This file | Why the module exists, components, data model, phased build plan, [build status](#12-build-status) |
 | [`ui-and-ai-spec.md`](ui-and-ai-spec.md) | Screen wireframes and the AI draft assistant's prompt/output contract |
 | [`schemas/draft-quote.schema.json`](schemas/draft-quote.schema.json) | Machine-readable output contract for the AI draft assistant |
+
+**This module is built.** Phases A–C are running code — `web/` (GitHub Pages) and
+`worker/` (Cloudflare Workers + D1 + OpenRouter). See
+[build status](#12-build-status) for what is and isn't done, and
+[deployment](../deployment.md) to run it.
 
 ---
 
@@ -241,3 +246,42 @@ AI here is a **drafting assistant, not an autonomous pricer.** It accelerates th
 writing it all out — but the owner or estimator always confirms quantities, pricing, and margin
 before anything reaches a client. This keeps trust intact and avoids the real risk of an
 underpriced job going out the door on autopilot.
+
+In the build this is not a convention but a set of enforced rules, each in a place
+a caller cannot route around:
+
+| Guardrail | Where it is enforced |
+| --- | --- |
+| The AI cannot return a price | The wire schema has no price field, and unknown properties are rejected — `worker/src/schema.js` |
+| The AI cannot invent a line item | `line_code` is checked against the matched template's codes |
+| An inferred quantity cannot claim high confidence | `validateDraft()`, which also requires a note on anything below high |
+| A failed draft changes nothing | The Worker rejects the response instead of repairing it; the quote is left as it was |
+| AI-drafted lines cannot be sent unreviewed | `sendBlockers()` — the API returns 422, so skipping the UI does not skip the gate |
+| A quote below the margin floor cannot be sent silently | Same gate; an override requires a reason, which is written to `quote_events` |
+| Money never comes from the client | Every write reprices from the `PriceBook` server-side |
+| The client never sees cost or margin | `clientView()` names the fields that go out rather than deleting the ones that shouldn't |
+
+---
+
+## 12. Build Status
+
+| Phase | Status |
+| --- | --- |
+| **A — Templates + manual quoting** | Built. Two starter templates, price book, margin display, shareable link. |
+| **B — Interactive client quote** | Built. Toggleable extras with live totals, Accept & Book creating a job, engagement events (`opened`, `extra_toggled`, `accepted`, `question_asked`). |
+| **C — AI draft assistant** | Built. Typed or dictated description → draft line items, assumptions, flags, confidence, tap-to-confirm. |
+| **D — Photo estimating & learning loop** | Not built. Past-job data is already fed to the assistant and quote-vs-actual baselines are captured on every accepted job, so the inputs exist; photo upload and the variance report do not. |
+
+Known gaps, deliberately left:
+
+- **Voice notes use the browser's Web Speech API**, which Chrome and Safari support
+  and Firefox does not. The button says so rather than failing quietly. A
+  server-side transcription service would remove the browser dependency.
+- **No photo upload**, so the client quote shows no site photo — the wireframe's
+  photo panel stays hidden rather than showing a placeholder where a client's own
+  property should be.
+- **One shared owner token**, not per-user accounts. Right for a single owner,
+  wrong for a team; see [deployment](../deployment.md#security-notes).
+- **`similar_past_jobs_reference` uses quoted-vs-quoted-cost**, not real actuals,
+  because nothing yet records what a job actually cost. That is exactly what the
+  variance report in Phase D is for.

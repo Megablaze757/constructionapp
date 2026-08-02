@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1a56db">
+<title>Quotes — BuilderOS</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/app.css">
+<script src="config.js"></script>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <h1>Quotes</h1>
+    <button class="btn btn-sm" id="settings-btn" type="button">Settings</button>
+  </div>
+
+  <div id="banner"></div>
+
+  <div class="card">
+    <h2>New quote</h2>
+    <div class="card-body">
+      <label>Client
+        <input type="text" id="client_name" placeholder="e.g. Sarah Higgins" autocomplete="off">
+      </label>
+      <label>Job type
+        <select id="job_type"><option value="">Loading templates…</option></select>
+      </label>
+      <label>Site
+        <input type="text" id="site_address" placeholder="e.g. 14 Elm St" autocomplete="off">
+      </label>
+      <button class="btn btn-primary" id="create-btn" type="button">Start quote →</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Recent</h2>
+    <div class="lines" id="quote-list">
+      <div class="card-body muted">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<dialog id="settings-dialog">
+  <form method="dialog" class="card-body">
+    <h2>Connection</h2>
+    <p class="muted" style="margin:0">
+      The Quote Builder talks to your Cloudflare Worker. The owner token is the
+      <code>OWNER_TOKEN</code> secret you set on it, and is stored only in this browser.
+    </p>
+    <label>API base URL
+      <input type="text" id="api-base-display" readonly>
+    </label>
+    <label>Owner token
+      <input type="text" id="owner-token" placeholder="paste your OWNER_TOKEN" autocomplete="off">
+    </label>
+    <div class="btn-row">
+      <button class="btn" value="cancel" type="submit">Cancel</button>
+      <button class="btn btn-primary" id="save-settings" value="save" type="submit">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module" src="assets/js/list.js"></script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "name": "builderos-quoting-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Auto-quoting API for BuilderOS — Cloudflare Worker + D1 + OpenRouter",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "node --test \"test/*.test.js\"",
+    "db:local": "wrangler d1 execute builderos-quoting --local --file=migrations/0001_init.sql && wrangler d1 execute builderos-quoting --local --file=migrations/0002_seed.sql",
+    "db:remote": "wrangler d1 execute builderos-quoting --remote --file=migrations/0001_init.sql && wrangler d1 execute builderos-quoting --remote --file=migrations/0002_seed.sql",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1",
+    "wrangler": "^4.42.0"
+  }
+}

@@ -1,0 +1,55 @@
+name: Deploy web to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+# Allow one concurrent deployment, letting an in-progress run finish so a
+# half-published site is never left live.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # The site is plain ES modules — nothing to build, so the artifact is the
+      # directory as committed. Any bundler here would only add ways to break.
+      - name: Point the frontend at the deployed Worker
+        env:
+          API_BASE: ${{ vars.API_BASE }}
+          BUSINESS_NAME: ${{ vars.BUSINESS_NAME }}
+        run: |
+          if [ -n "$API_BASE" ]; then
+            {
+              echo "window.BUILDEROS_CONFIG = {"
+              echo "  apiBase: '${API_BASE}',"
+              echo "  businessName: '${BUSINESS_NAME:-Builder Co.}',"
+              echo "};"
+            } > web/config.js
+            echo "config.js written for ${API_BASE}"
+          else
+            echo "::warning::Repository variable API_BASE is not set; using the committed config.js."
+          fi
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4

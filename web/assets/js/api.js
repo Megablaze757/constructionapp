@@ -1,0 +1,123 @@
+/** Thin API client shared by the owner screens and the client quote page. */
+
+const cfg = window.BUILDEROS_CONFIG || {};
+const override = new URLSearchParams(location.search).get('api');
+
+export const API_BASE = (override || cfg.apiBase || '').replace(/\/$/, '');
+export const BUSINESS_NAME = cfg.businessName || 'Builder Co.';
+
+const TOKEN_KEY = 'builderos.ownerToken';
+
+export const ownerToken = {
+  get: () => localStorage.getItem(TOKEN_KEY) || '',
+  set: (v) => localStorage.setItem(TOKEN_KEY, v),
+  clear: () => localStorage.removeItem(TOKEN_KEY),
+};
+
+export class ApiError extends Error {
+  constructor(message, status, body) {
+    super(message);
+    this.status = status;
+    this.body = body || {};
+  }
+}
+
+async function request(path, { method = 'GET', body, auth = true } = {}) {
+  if (!API_BASE) {
+    throw new ApiError('No API configured. Set apiBase in config.js.', 0);
+  }
+  const headers = {};
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (auth) {
+    const token = ownerToken.get();
+    if (!token) throw new ApiError('Owner token not set.', 401);
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    // A CORS rejection and an offline device are indistinguishable from here, so
+    // name both rather than guessing wrong.
+    throw new ApiError('Could not reach the API. Check the Worker URL, its CORS allowlist, and your connection.', 0);
+  }
+
+  const text = await res.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { error: text.slice(0, 200) };
+  }
+  if (!res.ok) throw new ApiError(data.error || `Request failed (${res.status})`, res.status, data);
+  return data;
+}
+
+/* ------------------------------------------------------------------- owner */
+
+export const api = {
+  health: () => request('/health', { auth: false }),
+  templates: () => request('/api/templates'),
+  priceBook: () => request('/api/pricebook'),
+  listQuotes: () => request('/api/quotes'),
+  createQuote: (data) => request('/api/quotes', { method: 'POST', body: data }),
+  getQuote: (id) => request(`/api/quotes/${id}`),
+  patchQuote: (id, data) => request(`/api/quotes/${id}`, { method: 'PATCH', body: data }),
+  deleteQuote: (id) => request(`/api/quotes/${id}`, { method: 'DELETE' }),
+  draft: (id, description) => request(`/api/quotes/${id}/draft`, { method: 'POST', body: { description } }),
+  putLines: (id, lines) => request(`/api/quotes/${id}/lines`, { method: 'PUT', body: { lines } }),
+  confirmAll: (id) => request(`/api/quotes/${id}/lines/confirm-all`, { method: 'POST' }),
+  send: (id, overrideReason) =>
+    request(`/api/quotes/${id}/send`, {
+      method: 'POST',
+      body: overrideReason ? { override_reason: overrideReason } : {},
+    }),
+};
+
+/* ------------------------------------------------------------------ client */
+
+export const clientApi = {
+  get: (token) => request(`/q/${token}`, { auth: false }),
+  setExtras: (token, selected) => request(`/q/${token}/extras`, { method: 'POST', body: { selected }, auth: false }),
+  accept: (token) => request(`/q/${token}/accept`, { method: 'POST', auth: false }),
+  ask: (token, message) => request(`/q/${token}/question`, { method: 'POST', body: { message }, auth: false }),
+};
+
+/* ----------------------------------------------------------------- helpers */
+
+export const gbp = new Intl.NumberFormat('en-GB', {
+  style: 'currency',
+  currency: 'GBP',
+  maximumFractionDigits: 0,
+});
+
+export const gbpExact = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
+
+/** Whole pounds read better on site; pennies only when they actually exist. */
+export function price(n) {
+  const v = Number(n) || 0;
+  return Number.isInteger(v) ? gbp.format(v) : gbpExact.format(v);
+}
+
+export function titleCase(slug = '') {
+  return slug.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export function formatDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso.length <= 10 ? `${iso}T00:00:00` : iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/** Minimal escaping for the few places we build markup from data. */
+export function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}

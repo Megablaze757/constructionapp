@@ -46,8 +46,13 @@
     "lineItem": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["description", "quantity_estimate", "unit", "source", "confidence"],
+      "required": ["line_code", "description", "quantity_estimate", "unit", "source", "confidence"],
       "properties": {
+        "line_code": {
+          "type": "string",
+          "description": "Identifier of the line in the matched QuoteTemplate, which resolves to a PriceBook entry. Constrained at runtime to the codes the matched template offers, so the model cannot invent a line — and therefore cannot invent a price by inventing a product.",
+          "pattern": "^[a-z0-9]+(_[a-z0-9]+)*$"
+        },
         "description": {
           "type": "string",
           "minLength": 1,

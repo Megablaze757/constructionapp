@@ -170,6 +170,7 @@ merely instructed.
   "confidence": "medium",
   "line_items": [
     {
+      "line_code": "scaffold_erect",
       "description": "Scaffold erect",
       "quantity_estimate": 45,
       "unit": "m2",
@@ -178,6 +179,7 @@ merely instructed.
       "note": "Estimated from '2 lifts, rear of property' — confirm actual measurement on site"
     },
     {
+      "line_code": "scaffold_hire",
       "description": "Scaffold hire",
       "quantity_estimate": 5,
       "unit": "days",
@@ -185,6 +187,7 @@ merely instructed.
       "confidence": "high"
     },
     {
+      "line_code": "scaffold_dismantle",
       "description": "Dismantle",
       "quantity_estimate": 1,
       "unit": "job",
@@ -210,11 +213,32 @@ merely instructed.
 
 | Field | Meaning |
 | --- | --- |
+| `line_code` | The template line this maps to, which resolves to a `PriceBook` entry. Constrained at runtime to the codes the matched template offers |
 | `source: explicit_in_description` | Stated outright in the input — safe to trust |
 | `source: ai_inferred` | Derived, not stated — always needs owner confirmation |
 | `source: template_default` | Pulled from the `QuoteTemplate`, not the input |
 | `confidence` | `high` / `medium` / `low`, per item and for the draft overall |
 | `note` | Required whenever the owner needs context to judge the number |
+
+**Two schemas, one contract**
+
+Provider strict mode (OpenRouter/OpenAI-flavoured structured outputs) is a subset of JSON Schema:
+no `if`/`then`/`allOf`, every property must appear in `required`, and "optional" has to be
+expressed as a nullable union. The interesting guardrails here — *an inferred quantity is never
+high confidence*, *anything below high confidence must carry a note* — are exactly the conditional
+rules it cannot express. So the implementation splits them:
+
+| | Purpose | Where |
+| --- | --- | --- |
+| **Wire schema** | Constrains the model's output *shape* at generation time | `worker/src/schema.js` → `WIRE_SCHEMA` |
+| **Canonical schema** | The full contract, conditionals included | [`schemas/draft-quote.schema.json`](schemas/draft-quote.schema.json) |
+| **Validator** | Enforces the contract on every response | `worker/src/schema.js` → `validateDraft()` |
+
+A response that satisfies the wire schema can still violate the contract. That is what the second
+pass is for, and it is the reason the guardrails live in code rather than in the prompt: a prompt
+asks, a validator refuses. A draft that fails validation is **rejected outright** rather than
+repaired — silently fixing it would put an unlabelled number in front of the owner, which is the
+one thing the `source`/`confidence` tags exist to prevent.
 
 ### 2.4 Why Structured Output Matters Here
 

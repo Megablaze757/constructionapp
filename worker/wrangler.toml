@@ -1,0 +1,22 @@
+name = "builderos-quoting"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+# Secrets (set with `wrangler secret put`, never in this file):
+#   OPENROUTER_API_KEY   your OpenRouter key
+#   OWNER_TOKEN          shared token the Quote Builder authenticates with
+[vars]
+# Comma-separated CORS allowlist. Replace with your GitHub Pages origin.
+ALLOWED_ORIGINS = "http://localhost:8788,http://127.0.0.1:8788"
+# Public base URL of the Pages site, used to build the client quote link.
+PUBLIC_APP_URL = "http://localhost:8788"
+# Any model on OpenRouter that supports structured outputs.
+OPENROUTER_MODEL = "anthropic/claude-sonnet-5"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "builderos-quoting"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+[observability]
+enabled = true

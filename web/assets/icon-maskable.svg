@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="BuilderOS">
+  <rect width="192" height="192" fill="#1a56db"/>
+  <g fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round">
+    <path d="M58 138V68M96 138V68M134 138V68"/>
+    <path d="M50 68h92M50 103h92M50 138h92"/>
+  </g>
+</svg>
