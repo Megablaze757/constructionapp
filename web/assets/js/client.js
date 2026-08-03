@@ -5,7 +5,7 @@
  * renders what the API chooses to send. It never sees cost or margin.
  */
 
-import { clientApi, BUSINESS_NAME, price, titleCase, formatDate, esc, ApiError } from './api.js';
+import { clientApi, API_BASE, BUSINESS_NAME, price, titleCase, formatDate, esc, ApiError } from './api.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -45,6 +45,7 @@ function render() {
   $('validity').textContent = quote.valid_until ? `Valid until ${formatDate(quote.valid_until)}` : '';
   $('job-title').textContent = titleCase(quote.job_type);
   $('job-summary').textContent = quote.summary || '';
+  renderPhotos();
 
   $('scope').innerHTML = quote.scope
     .map((s) => `<li>${esc(s.description)}${s.quantity ? ` — ${s.quantity} ${esc(s.unit)}` : ''}</li>`)
@@ -69,6 +70,22 @@ function render() {
     $('accepted-note').innerHTML =
       "<div class='notice notice-ok'><strong>Booked ✅</strong>We'll be in touch to confirm your start date.</div>";
   }
+}
+
+/** Real site photos, or nothing — never a placeholder standing in for the client's property. */
+function renderPhotos() {
+  const host = $('photo');
+  const photos = quote.photos || [];
+  if (!photos.length) {
+    host.hidden = true;
+    return;
+  }
+  host.hidden = false;
+  host.innerHTML = photos
+    .map((p) => `<img src="${API_BASE}/q/${encodeURIComponent(token)}/photo/${encodeURIComponent(p.id)}"
+                      alt="${esc(p.caption || 'Site photo')}" loading="lazy">`)
+    .join('');
+  host.classList.toggle('photo-multi', photos.length > 1);
 }
 
 function renderExtras() {

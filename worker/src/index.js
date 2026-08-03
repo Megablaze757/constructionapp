@@ -10,7 +10,13 @@
 import { json, fail, requireOwner, corsHeaders, newId, randomToken } from './http.js';
 import { priceLine, totalQuote, sendBlockers, money } from './pricing.js';
 import { requestDraft } from './openrouter.js';
+import {
+  jobVariance, byJobType, lineCodeBias, biasBriefing, summarise,
+} from './variance.js';
 import * as db from './db.js';
+
+/** Cap on a single uploaded photo, after the browser has downscaled it. */
+const MAX_PHOTO_BYTES = 1_000_000;
 
 export default {
   async fetch(request, env, ctx) {
@@ -66,6 +72,12 @@ async function ownerRoutes(path, request, env, ctxo) {
     return createQuote(request, env, ctxo);
   }
 
+  if (resource === 'reports' && id === 'variance' && method === 'GET') {
+    return varianceReport(env, ctxo);
+  }
+
+  if (resource === 'jobs') return jobRoutes(id, action, subId, request, env, ctxo);
+
   if (resource !== 'quotes' || !id) return fail(404, 'Not found', {}, ctxo);
 
   const row = await db.getQuoteRow(D1, id);
@@ -87,6 +99,33 @@ async function ownerRoutes(path, request, env, ctxo) {
   if (!action && method === 'DELETE') {
     await D1.prepare('DELETE FROM quotes WHERE id = ?1').bind(id).run();
     return json({ deleted: id }, ctxo);
+  }
+
+  if (action === 'photos' && method === 'GET' && !subId) {
+    return json({ photos: await db.listPhotos(D1, id) }, ctxo);
+  }
+  // Owner-side photo bytes. The public route deliberately 404s a draft quote, so
+  // the builder cannot use it to show the owner their own photos before sending.
+  if (action === 'photos' && method === 'GET' && subId) {
+    const owned = await D1.prepare('SELECT id FROM quote_photos WHERE id = ?1 AND quote_id = ?2')
+      .bind(subId, id)
+      .first();
+    if (!owned) return fail(404, 'Photo not found', {}, ctxo);
+    const photo = await db.getPhotoBytes(D1, subId);
+    return new Response(photo.bytes, {
+      headers: {
+        'Content-Type': photo.mime,
+        'Cache-Control': 'private, max-age=3600',
+        ...corsHeaders(env, request),
+      },
+    });
+  }
+  if (action === 'photos' && method === 'POST') return addPhoto(row, request, env, ctxo);
+  if (action === 'photos' && method === 'DELETE' && subId) {
+    await D1.prepare('DELETE FROM quote_photos WHERE id = ?1 AND quote_id = ?2')
+      .bind(subId, id)
+      .run();
+    return json({ deleted: subId }, ctxo);
   }
 
   if (action === 'draft' && method === 'POST') return draftQuote(row, request, env, ctxo);
@@ -205,12 +244,24 @@ async function draftQuote(row, request, env, ctxo) {
   const template = await db.getTemplate(D1, row.job_type);
   if (!template) return fail(400, 'Template missing for this quote.', {}, ctxo);
 
-  const [book, similar] = await Promise.all([
+  const [book, similar, quotedLines, actualCosts] = await Promise.all([
     db.getPriceBook(D1),
     db.similarPastJobs(D1, row.job_type),
+    db.quotedLinesForCompletedJobs(D1),
+    db.allActualCosts(D1),
   ]);
 
-  const result = await requestDraft(env, { description, template, priceBook: book, similarJobs: similar });
+  // The learning loop: measured drift between what this business quoted and what
+  // its jobs actually cost, fed back in as scoping guidance.
+  const estimatingHistory = biasBriefing(lineCodeBias(quotedLines, actualCosts));
+
+  const result = await requestDraft(env, {
+    description,
+    template,
+    priceBook: book,
+    similarJobs: similar,
+    estimatingHistory,
+  });
   if (!result.ok) {
     await db.logEvent(D1, row.id, 'ai_draft_failed', { error: result.error });
     return fail(502, result.error, { detail: result.detail }, ctxo);
@@ -251,6 +302,7 @@ async function draftQuote(row, request, env, ctxo) {
     assumptions: result.draft.assumptions,
     flags_for_owner_review: result.draft.flags_for_owner_review,
     similar_past_jobs_reference: similar,
+    estimating_history: estimatingHistory,
     model: result.model,
     drafted_at: new Date().toISOString(),
   };
@@ -339,6 +391,157 @@ async function sendQuote(row, request, env, ctxo) {
   );
 }
 
+/* --------------------------------------------------- jobs & cost capture */
+
+async function jobRoutes(id, action, subId, request, env, ctxo) {
+  const D1 = env.DB;
+  const method = request.method;
+
+  if (!id && method === 'GET') return json({ jobs: await db.listJobs(D1) }, ctxo);
+  if (!id) return fail(404, 'Not found', {}, ctxo);
+
+  const job = await db.getJob(D1, id);
+  if (!job) return fail(404, 'Job not found', {}, ctxo);
+
+  if (!action && method === 'GET') {
+    const costs = await db.getJobCosts(D1, id);
+    return json({ job, costs, variance: jobVariance(job, costs) }, ctxo);
+  }
+
+  if (!action && method === 'PATCH') {
+    const body = await readJson(request);
+    const status = body.status;
+    if (!['booked', 'in_progress', 'complete'].includes(status)) {
+      return fail(400, 'status must be booked, in_progress or complete', {}, ctxo);
+    }
+    // Stamp the completion date on the transition, and clear it if the job is
+    // reopened — otherwise a reopened job keeps a date that says it finished.
+    await D1.prepare(
+      `UPDATE jobs
+          SET status = ?2,
+              completed_at = CASE WHEN ?2 = 'complete' THEN COALESCE(completed_at, date('now')) ELSE NULL END
+        WHERE id = ?1`,
+    ).bind(id, status).run();
+
+    const updated = await db.getJob(D1, id);
+    const costs = await db.getJobCosts(D1, id);
+    return json({ job: updated, costs, variance: jobVariance(updated, costs) }, ctxo);
+  }
+
+  if (action === 'costs' && method === 'POST') {
+    const body = await readJson(request);
+    const amount = Number(body.amount);
+    if (!Number.isFinite(amount) || amount < 0) {
+      return fail(400, 'amount must be a number of 0 or more', {}, ctxo);
+    }
+    if (!String(body.description || '').trim()) {
+      return fail(400, 'description is required', {}, ctxo);
+    }
+    await D1.prepare(
+      `INSERT INTO job_costs (id, job_id, line_code, description, category, quantity, unit, amount, incurred_on, note)
+       VALUES (?1,?2,?3,?4,?5,?6,?7,?8,COALESCE(?9, date('now')),?10)`,
+    ).bind(
+      newId('jc'),
+      id,
+      body.line_code || null,
+      String(body.description).trim(),
+      ['labour', 'material', 'plant', 'other'].includes(body.category) ? body.category : 'other',
+      body.quantity == null ? null : Number(body.quantity),
+      body.unit || null,
+      money(amount),
+      body.incurred_on || null,
+      body.note || null,
+    ).run();
+
+    const costs = await db.getJobCosts(D1, id);
+    return json({ job, costs, variance: jobVariance(job, costs) }, { ...ctxo, status: 201 });
+  }
+
+  if (action === 'costs' && method === 'DELETE' && subId) {
+    await D1.prepare('DELETE FROM job_costs WHERE id = ?1 AND job_id = ?2').bind(subId, id).run();
+    const costs = await db.getJobCosts(D1, id);
+    return json({ job, costs, variance: jobVariance(job, costs) }, ctxo);
+  }
+
+  return fail(404, 'Not found', {}, ctxo);
+}
+
+/**
+ * Quote-vs-actual variance (Phase D).
+ *
+ * The report the owner reads, and the same data the draft assistant is briefed
+ * with — one source, so the numbers on screen and the numbers steering the AI
+ * cannot disagree.
+ */
+async function varianceReport(env, ctxo) {
+  const D1 = env.DB;
+  const [rows, quotedLines, actualCosts] = await Promise.all([
+    db.completedJobsWithCosts(D1),
+    db.quotedLinesForCompletedJobs(D1),
+    db.allActualCosts(D1),
+  ]);
+
+  // A completed job with nothing booked against it would read as 100% under
+  // budget and quietly poison every average on the page.
+  const measured = rows.filter(({ costs }) => costs.length > 0);
+  const variances = measured.map(({ job, costs }) => jobVariance(job, costs));
+  const bias = lineCodeBias(quotedLines, actualCosts);
+
+  return json(
+    {
+      summary: summarise(variances),
+      jobs: variances.sort((a, b) => Math.abs(b.cost_variance) - Math.abs(a.cost_variance)),
+      by_job_type: byJobType(variances),
+      line_code_bias: bias,
+      assistant_briefing: biasBriefing(bias),
+      unmeasured_jobs: rows.length - measured.length,
+    },
+    ctxo,
+  );
+}
+
+/* ------------------------------------------------------------------ photos */
+
+async function addPhoto(row, request, env, ctxo) {
+  const body = await readJson(request);
+  const mime = String(body.mime || '');
+  if (!/^image\/(jpeg|png|webp)$/.test(mime)) {
+    return fail(400, 'Photo must be a JPEG, PNG or WebP.', {}, ctxo);
+  }
+
+  let bytes;
+  try {
+    const b64 = String(body.data_base64 || '').replace(/^data:[^,]+,/, '');
+    const bin = atob(b64);
+    bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  } catch {
+    return fail(400, 'Photo data could not be decoded.', {}, ctxo);
+  }
+  if (!bytes.length) return fail(400, 'Photo is empty.', {}, ctxo);
+  if (bytes.length > MAX_PHOTO_BYTES) {
+    return fail(413, `Photo is ${Math.round(bytes.length / 1024)}KB; the limit is ${MAX_PHOTO_BYTES / 1024}KB.`, {}, ctxo);
+  }
+
+  const existing = await db.listPhotos(env.DB, row.id);
+  const id = newId('ph');
+  await env.DB.prepare(
+    `INSERT INTO quote_photos (id, quote_id, position, mime, bytes, width, height, caption, show_client)
+     VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)`,
+  ).bind(
+    id,
+    row.id,
+    existing.length,
+    mime,
+    bytes,
+    body.width ? Number(body.width) : null,
+    body.height ? Number(body.height) : null,
+    body.caption || null,
+    body.show_client === false ? 0 : 1,
+  ).run();
+
+  return json({ photos: await db.listPhotos(env.DB, row.id), id }, { ...ctxo, status: 201 });
+}
+
 /* ----------------------------------------------------------------- client */
 
 /**
@@ -346,7 +549,7 @@ async function sendQuote(row, request, env, ctxo) {
  * deletion: we name the fields that go out, so a new internal column (cost,
  * margin, an AI note to the owner) can never leak by being forgotten here.
  */
-function clientView(quote, lines, totals) {
+function clientView(quote, lines, totals, photos = []) {
   const pick = (l) => ({
     id: l.id,
     description: l.description,
@@ -369,6 +572,8 @@ function clientView(quote, lines, totals) {
     valid_until: quote.valid_until,
     accepted_at: quote.accepted_at,
     scope: base.map((l) => ({ description: l.description, quantity: l.quantity, unit: l.unit })),
+    // Ids only; the bytes are fetched from the token-scoped photo route.
+    photos: photos.map((p) => ({ id: p.id, caption: p.caption, width: p.width, height: p.height })),
     base_price: totals.subtotal_price,
     extras: lines.filter((l) => l.kind === 'extra').map(pick),
     total: totals.total_with_extras,
@@ -390,12 +595,37 @@ async function clientRoutes(path, request, env, ctxo) {
   const expired = row.valid_until && row.valid_until < new Date().toISOString().slice(0, 10);
 
   if (!action && request.method === 'GET') {
-    const loaded = await db.loadQuote(D1, row);
+    const [loaded, photos] = await Promise.all([
+      db.loadQuote(D1, row),
+      db.listPhotos(D1, row.id, { clientOnly: true }),
+    ]);
     if (row.status === 'sent') {
       await D1.prepare("UPDATE quotes SET status = 'viewed' WHERE id = ?1").bind(row.id).run();
     }
     await db.logEvent(D1, row.id, 'opened', {});
-    return json({ quote: { ...clientView(loaded.quote, loaded.lines, loaded.totals), expired } }, ctxo);
+    return json(
+      { quote: { ...clientView(loaded.quote, loaded.lines, loaded.totals, photos), expired } },
+      ctxo,
+    );
+  }
+
+  // Photo bytes, scoped to the quote's own token so a photo id alone is not a
+  // handle on someone else's site pictures.
+  if (action === 'photo' && seg[3] && request.method === 'GET') {
+    const owned = await D1.prepare(
+      'SELECT id FROM quote_photos WHERE id = ?1 AND quote_id = ?2 AND show_client = 1',
+    ).bind(seg[3], row.id).first();
+    if (!owned) return fail(404, 'Not found', {}, ctxo);
+
+    const photo = await db.getPhotoBytes(D1, seg[3]);
+    return new Response(photo.bytes, {
+      headers: {
+        'Content-Type': photo.mime,
+        // Immutable: a photo id never points at different bytes.
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        ...corsHeaders(env, request),
+      },
+    });
   }
 
   if (expired || row.status === 'accepted') {

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1a56db">
+<title>Jobs — BuilderOS</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/app.css">
+<script src="config.js"></script>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <a class="back" href="index.html" aria-label="Back to quotes">←</a>
+    <h1>Jobs</h1>
+    <a class="btn btn-sm" href="variance.html">Variance →</a>
+  </div>
+
+  <div id="banner"></div>
+
+  <!-- Job list -->
+  <div id="list-view">
+    <div class="card">
+      <h2>Booked &amp; running</h2>
+      <div class="lines" id="job-list"><div class="card-body muted">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- Job detail -->
+  <div id="detail-view" hidden>
+    <div class="card">
+      <div class="card-body">
+        <h2 style="font-size:18px;text-transform:none;letter-spacing:0;color:var(--ink);padding:0" id="job-title"></h2>
+        <p class="muted" id="job-meta" style="margin:0"></p>
+        <label>Status
+          <select id="job-status">
+            <option value="booked">Booked</option>
+            <option value="in_progress">In progress</option>
+            <option value="complete">Complete</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Quoted vs actual</h2>
+      <div class="card-body" id="job-variance"></div>
+    </div>
+
+    <div class="card">
+      <h2>Costs booked</h2>
+      <div class="lines" id="cost-list"></div>
+      <div class="card-body">
+        <button class="btn" id="add-cost-btn" type="button">+ Log a cost</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<dialog id="cost-dialog">
+  <form method="dialog" class="card-body">
+    <h2>Log a cost</h2>
+    <label>Against which quoted line?
+      <select id="cost-line"></select>
+    </label>
+    <label>Description
+      <input type="text" id="cost-desc" placeholder="e.g. Erect labour, 2 days" autocomplete="off">
+    </label>
+    <label>Amount (£, actual cost to you)
+      <input type="number" id="cost-amount" min="0" step="0.01" inputmode="decimal">
+    </label>
+    <label>Category
+      <select id="cost-category">
+        <option value="labour">Labour</option>
+        <option value="material">Material</option>
+        <option value="plant">Plant</option>
+        <option value="other">Other</option>
+      </select>
+    </label>
+    <label>Date
+      <input type="text" id="cost-date" placeholder="YYYY-MM-DD (blank = today)" autocomplete="off">
+    </label>
+    <div class="btn-row">
+      <button class="btn" value="cancel" type="submit">Cancel</button>
+      <button class="btn btn-primary" value="save" type="submit">Log cost</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module" src="assets/js/jobs.js"></script>
+</body>
+</html>

@@ -44,6 +44,9 @@ Create the tables and load the starter templates and price book:
 npm run db:remote
 ```
 
+`0001` is a **destructive reset** — it drops every table before recreating it. That is what you
+want on first install, and not what you want later.
+
 Set the two secrets. `OWNER_TOKEN` is one you invent — it is what the Quote
 Builder authenticates with, so make it long and random:
 
@@ -139,8 +142,7 @@ Four terminals, or run the first three in the background:
 ```bash
 # 1. the API
 cd worker && npm install
-npx wrangler d1 execute builderos-quoting --local --file=migrations/0001_init.sql
-npx wrangler d1 execute builderos-quoting --local --file=migrations/0002_seed.sql
+npm run db:local                    # applies all three migrations
 npx wrangler dev                    # http://127.0.0.1:8787
 
 # 2. a stand-in for OpenRouter, so you can develop without spending tokens
@@ -203,6 +205,11 @@ which the Worker rejects as a failed draft.
 - **Prices are never accepted from a client.** Everything is recomputed server-side
   from the price book on every write, so a tampered request cannot set its own
   price.
+- **Site photos are served two ways, deliberately.** The client route is scoped to
+  the quote's own token, so a photo id alone is not a handle on someone else's site
+  pictures, and it serves only photos flagged for the client. The builder uses an
+  authenticated route instead, because the public one 404s a draft quote and an
+  owner must be able to review photos before sending.
 
 ## Costs
 

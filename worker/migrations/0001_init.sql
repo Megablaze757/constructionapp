@@ -1,6 +1,12 @@
 -- Auto-Quoting module — D1 schema.
 -- Mirrors the data model in docs/auto-quoting/README.md §8.
 
+-- Dependents first: job_costs and quote_photos hold foreign keys into jobs and
+-- quotes, so dropping those before these would fail with enforcement on. They
+-- are created in 0003; dropping them here keeps a full re-run a clean reset
+-- rather than leaving orphaned rows behind to skew the variance report.
+DROP TABLE IF EXISTS job_costs;
+DROP TABLE IF EXISTS quote_photos;
 DROP TABLE IF EXISTS quote_events;
 DROP TABLE IF EXISTS quote_line_items;
 DROP TABLE IF EXISTS jobs;

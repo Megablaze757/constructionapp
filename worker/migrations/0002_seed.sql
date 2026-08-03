@@ -70,12 +70,25 @@ INSERT INTO quotes (id, public_token, template_id, job_type, client_name, site_a
 VALUES
   ('q_seed_vine','tok_seed_vine','tpl_domestic_scaffold','domestic_scaffold_erect',
    'M. Okafor','22 Vine Rd','Scaffold erect to rear, 2 lifts','accepted',
-   1390.0,1780.0,21.9,25.0,30.0,'2026-06-01','2026-05-02','2026-05-02','2026-05-04'),
+   1330.0,1780.0,25.3,25.0,30.0,'2026-06-01','2026-05-02','2026-05-02','2026-05-04'),
   ('q_seed_ash','tok_seed_ash','tpl_domestic_scaffold','domestic_scaffold_erect',
    'D. Whitfield','8 Ashfield Cl','Side elevation scaffold, single lift','accepted',
-   980.0,1420.0,31.0,25.0,30.0,'2026-06-14','2026-05-15','2026-05-15','2026-05-18');
+   1010.0,1420.0,28.9,25.0,30.0,'2026-06-14','2026-05-15','2026-05-15','2026-05-18');
+
+-- The quoted lines behind those two jobs. Rates are held on the line rather than
+-- read from today's price book, because a historical quote is a snapshot — rates
+-- move, and a past job must not silently reprice itself.
+INSERT INTO quote_line_items
+  (id, quote_id, position, line_code, description, quantity, unit, unit_cost, unit_price, category, kind, source, confidence, confirmed)
+VALUES
+  ('li_seed_v1','q_seed_vine',0,'scaffold_erect',    'Scaffold erect',45,'m2',  19.50, 26.00,'labour','base','owner_entered','high',1),
+  ('li_seed_v2','q_seed_vine',1,'scaffold_hire',     'Scaffold hire',  5,'days',45.00, 68.00,'plant', 'base','owner_entered','high',1),
+  ('li_seed_v3','q_seed_vine',2,'scaffold_dismantle','Dismantle',      1,'job',227.50,270.00,'labour','base','owner_entered','high',1),
+  ('li_seed_a1','q_seed_ash', 0,'scaffold_erect',    'Scaffold erect',32,'m2',  19.50, 26.00,'labour','base','owner_entered','high',1),
+  ('li_seed_a2','q_seed_ash', 1,'scaffold_hire',     'Scaffold hire',  4,'days',45.00, 68.00,'plant', 'base','owner_entered','high',1),
+  ('li_seed_a3','q_seed_ash', 2,'scaffold_dismantle','Dismantle',      1,'job',206.00,316.00,'labour','base','owner_entered','high',1);
 
 INSERT INTO jobs (id, quote_id, client_name, site_address, job_type, status, budget_baseline, cost_baseline)
 VALUES
-  ('job_seed_vine','q_seed_vine','M. Okafor','22 Vine Rd','domestic_scaffold_erect','complete',1780.0,1390.0),
-  ('job_seed_ash','q_seed_ash','D. Whitfield','8 Ashfield Cl','domestic_scaffold_erect','complete',1420.0,980.0);
+  ('job_seed_vine','q_seed_vine','M. Okafor','22 Vine Rd','domestic_scaffold_erect','complete',1780.0,1330.0),
+  ('job_seed_ash','q_seed_ash','D. Whitfield','8 Ashfield Cl','domestic_scaffold_erect','complete',1420.0,1010.0);

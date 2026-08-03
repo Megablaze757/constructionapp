@@ -57,6 +57,18 @@
     </div>
   </div>
 
+  <!-- Site photos -->
+  <div class="card">
+    <h2>Site photos <span class="muted" style="text-transform:none;letter-spacing:0">shown on the client quote</span></h2>
+    <div class="card-body">
+      <div id="photo-grid"></div>
+      <label class="sr-only" for="photo-input">Add site photos</label>
+      <input type="file" id="photo-input" accept="image/*" multiple capture="environment" hidden>
+      <button class="btn" id="photo-btn" type="button">📷 Add site photo</button>
+      <p class="muted" style="margin:0">Resized in your browser before upload, so it works on a weak site signal.</p>
+    </div>
+  </div>
+
   <!-- AI assumptions and flags -->
   <div class="card" id="ai-summary" hidden>
     <h2>AI draft notes</h2>

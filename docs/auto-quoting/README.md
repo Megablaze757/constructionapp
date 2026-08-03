@@ -228,6 +228,55 @@ not generic assumptions.
 
 ---
 
+## 9a. The Learning Loop (Phase D, built)
+
+Phases A–C make quoting *faster*. This is the part that makes it *better*, and it only works
+because something finally records what a job cost rather than what it was expected to cost.
+
+```
+Client accepts  →  job created, quote becomes the budget baseline
+        ↓
+Owner logs actual costs as the job runs (optionally against the quoted line)
+        ↓
+Job marked complete
+        ↓
+Quote-vs-actual report        →  what the owner and accountant read
+        ↓
+Per-line estimating bias      →  "scaffold erect runs 12% over"
+        ↓
+Briefed into the next AI draft  →  scoped generously, with a note saying why
+```
+
+The owner-facing report and the assistant's briefing are computed from **one** function
+(`worker/src/variance.js`), so the numbers on screen and the numbers steering the AI cannot
+drift apart.
+
+### What counts as a signal
+
+Three rules stop the loop learning from noise:
+
+| Rule | Why |
+| --- | --- |
+| A job with **no** costs logged is excluded entirely | It would otherwise read as 100% under budget and drag every average down |
+| A line needs **≥2 completed jobs** before bias is reported | One bad week is not a bias |
+| Only **≥5% drift** is briefed to the assistant | Telling a model a line runs 1% over invites it to fiddle for no reason |
+
+Rollups are weighted by value rather than averaging percentages — one small job running 80% over
+should not outweigh five large ones landing on budget.
+
+The briefing's advice follows the direction of the drift: a line running *over* is scoped
+generously, a line running *under* is flagged as previously over-scoped. Both are sent as measured
+history, and neither loosens the rule that the assistant never outputs a price.
+
+### Known limitation
+
+A job marked complete with only **some** of its costs logged reads as an underspend, and there is
+no signal that would let the system tell "came in cheap" apart from "invoices not entered yet."
+Costs should be logged before a job is marked complete. The job screen warns when none have been
+recorded at all; it cannot detect a partial set.
+
+---
+
 ## 10. Success Metrics
 
 | Metric | Target |
@@ -260,6 +309,7 @@ a caller cannot route around:
 | A quote below the margin floor cannot be sent silently | Same gate; an override requires a reason, which is written to `quote_events` |
 | Money never comes from the client | Every write reprices from the `PriceBook` server-side |
 | The client never sees cost or margin | `clientView()` names the fields that go out rather than deleting the ones that shouldn't |
+| Measured history informs scope, never price | The learning loop briefs the assistant in words about *quantities*; the output schema still has no price field |
 
 ---
 
@@ -270,18 +320,20 @@ a caller cannot route around:
 | **A — Templates + manual quoting** | Built. Two starter templates, price book, margin display, shareable link. |
 | **B — Interactive client quote** | Built. Toggleable extras with live totals, Accept & Book creating a job, engagement events (`opened`, `extra_toggled`, `accepted`, `question_asked`). |
 | **C — AI draft assistant** | Built. Typed or dictated description → draft line items, assumptions, flags, confidence, tap-to-confirm. |
-| **D — Photo estimating & learning loop** | Not built. Past-job data is already fed to the assistant and quote-vs-actual baselines are captured on every accepted job, so the inputs exist; photo upload and the variance report do not. |
+| **D — Photo estimating & learning loop** | Mostly built. Site photo upload, cost capture against jobs, the quote-vs-actual variance report, and the [learning loop](#9a-the-learning-loop-phase-d-built) all work. Photo-based *scope estimating* and automatic template suggestions do not. |
 
 Known gaps, deliberately left:
 
+- **Photos are stored but not read by the AI.** Upload, downscaling, and display on
+  the client quote work; a vision model inferring scope *from* a photo does not.
+  That is the remaining half of Phase D.
+- **No automatic template suggestions** from recurring quote patterns.
 - **Voice notes use the browser's Web Speech API**, which Chrome and Safari support
   and Firefox does not. The button says so rather than failing quietly. A
   server-side transcription service would remove the browser dependency.
-- **No photo upload**, so the client quote shows no site photo — the wireframe's
-  photo panel stays hidden rather than showing a placeholder where a client's own
-  property should be.
 - **One shared owner token**, not per-user accounts. Right for a single owner,
   wrong for a team; see [deployment](../deployment.md#security-notes).
-- **`similar_past_jobs_reference` uses quoted-vs-quoted-cost**, not real actuals,
-  because nothing yet records what a job actually cost. That is exactly what the
-  variance report in Phase D is for.
+- **Partially-costed jobs skew the report** — see the
+  [limitation above](#known-limitation).
+- **Photos live in D1 as BLOBs**, which keeps deployment to a single binding. R2 is
+  the upgrade path once photo volume justifies a second service.

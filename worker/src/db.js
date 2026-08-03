@@ -167,24 +167,160 @@ export async function getEvents(db, quoteId) {
 
 /**
  * The last N completed jobs of this type, for the AI's scale sanity-check
- * (spec §2.2) and, later, the quoted-vs-actual learning loop.
+ * (spec §2.2) and the quoted-vs-actual learning loop.
+ *
+ * `actual_cost` is the sum of costs actually booked against the job. Where none
+ * have been recorded it falls back to the quoted cost and says so, because a
+ * silent fallback would feed the assistant a perfect-looking history that never
+ * happened.
  */
 export async function similarPastJobs(db, jobType, limit = 5) {
   const { results } = await db
     .prepare(
-      `SELECT j.site_address, j.job_type, j.budget_baseline AS quoted, j.cost_baseline AS actual_cost
+      `SELECT j.site_address,
+              j.job_type,
+              j.budget_baseline AS quoted,
+              j.cost_baseline   AS quoted_cost,
+              COALESCE(SUM(c.amount), 0) AS booked_cost,
+              COUNT(c.id)                AS cost_entries
          FROM jobs j
+    LEFT JOIN job_costs c ON c.job_id = j.id
         WHERE j.job_type = ?1 AND j.status = 'complete'
-        ORDER BY j.created_at DESC
+        GROUP BY j.id
+        ORDER BY COALESCE(j.completed_at, j.created_at) DESC
         LIMIT ?2`,
     )
     .bind(jobType, limit)
     .all();
 
-  return (results ?? []).map((r) => ({
-    job: `${r.site_address}, ${r.job_type.replace(/_/g, ' ')}`,
-    quoted: r.quoted,
-    actual_cost: r.actual_cost,
-    margin_actual: `${Math.round(((r.quoted - r.actual_cost) / r.quoted) * 100)}%`,
-  }));
+  return (results ?? []).map((r) => {
+    const hasActuals = r.cost_entries > 0;
+    const cost = hasActuals ? r.booked_cost : r.quoted_cost;
+    return {
+      job: `${r.site_address}, ${r.job_type.replace(/_/g, ' ')}`,
+      quoted: r.quoted,
+      actual_cost: Math.round(cost * 100) / 100,
+      margin_actual: `${Math.round(((r.quoted - cost) / r.quoted) * 100)}%`,
+      cost_basis: hasActuals ? 'actual' : 'quoted_estimate',
+    };
+  });
+}
+
+/* -------------------------------------------------------- jobs & variance */
+
+export async function listJobs(db) {
+  const { results } = await db
+    .prepare(
+      `SELECT j.*, COALESCE(SUM(c.amount), 0) AS actual_cost, COUNT(c.id) AS cost_entries
+         FROM jobs j
+    LEFT JOIN job_costs c ON c.job_id = j.id
+        GROUP BY j.id
+        ORDER BY COALESCE(j.completed_at, j.created_at) DESC, j.rowid DESC
+        LIMIT 100`,
+    )
+    .all();
+  return results ?? [];
+}
+
+export async function getJob(db, id) {
+  return db.prepare('SELECT * FROM jobs WHERE id = ?1').bind(id).first();
+}
+
+export async function getJobCosts(db, jobId) {
+  const { results } = await db
+    .prepare('SELECT * FROM job_costs WHERE job_id = ?1 ORDER BY incurred_on, rowid')
+    .bind(jobId)
+    .all();
+  return results ?? [];
+}
+
+/** Every completed job with its booked costs, for the variance report. */
+export async function completedJobsWithCosts(db) {
+  const [{ results: jobs }, { results: costs }] = await Promise.all([
+    db.prepare("SELECT * FROM jobs WHERE status = 'complete'").all(),
+    db
+      .prepare(
+        `SELECT c.* FROM job_costs c
+           JOIN jobs j ON j.id = c.job_id
+          WHERE j.status = 'complete'`,
+      )
+      .all(),
+  ]);
+
+  const byJob = new Map();
+  for (const c of costs ?? []) {
+    if (!byJob.has(c.job_id)) byJob.set(c.job_id, []);
+    byJob.get(c.job_id).push(c);
+  }
+  return (jobs ?? []).map((j) => ({ job: j, costs: byJob.get(j.id) ?? [] }));
+}
+
+/**
+ * Quoted lines for completed jobs, tagged with their job id so per-line-code
+ * bias can be matched against actual costs.
+ */
+export async function quotedLinesForCompletedJobs(db) {
+  const { results } = await db
+    .prepare(
+      `SELECT j.id AS job_id, li.line_code, li.description,
+              (li.unit_cost * li.quantity) AS line_cost
+         FROM jobs j
+         JOIN quotes q ON q.id = j.quote_id
+         JOIN quote_line_items li ON li.quote_id = q.id
+        WHERE j.status = 'complete' AND li.line_code IS NOT NULL
+          AND (li.kind = 'base' OR li.selected = 1)`,
+    )
+    .all();
+  return results ?? [];
+}
+
+export async function allActualCosts(db) {
+  const { results } = await db
+    .prepare(
+      `SELECT c.job_id, c.line_code, c.amount
+         FROM job_costs c
+         JOIN jobs j ON j.id = c.job_id
+        WHERE j.status = 'complete' AND c.line_code IS NOT NULL`,
+    )
+    .all();
+  return results ?? [];
+}
+
+/* ------------------------------------------------------------------ photos */
+
+export async function listPhotos(db, quoteId, { clientOnly = false } = {}) {
+  const { results } = await db
+    .prepare(
+      `SELECT id, position, mime, width, height, caption, show_client
+         FROM quote_photos
+        WHERE quote_id = ?1 ${clientOnly ? 'AND show_client = 1' : ''}
+        ORDER BY position, rowid`,
+    )
+    .bind(quoteId)
+    .all();
+  return (results ?? []).map((p) => ({ ...p, show_client: !!p.show_client }));
+}
+
+export async function getPhotoBytes(db, photoId) {
+  const row = await db
+    .prepare('SELECT mime, bytes FROM quote_photos WHERE id = ?1')
+    .bind(photoId)
+    .first();
+  return row ? { mime: row.mime, bytes: toBytes(row.bytes) } : null;
+}
+
+/**
+ * Normalise a D1 BLOB into a Uint8Array.
+ *
+ * D1 hands BLOB columns back as a plain Array<number>. Passing that straight to
+ * `new Response()` does not send the bytes — it stringifies the array, so the
+ * client receives "255,216,255,…" under an image/jpeg content-type: right
+ * status, right headers, three times the size, and an image that will not
+ * decode. Normalising here keeps every caller safe from that.
+ */
+function toBytes(value) {
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  if (ArrayBuffer.isView(value)) return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  if (Array.isArray(value)) return Uint8Array.from(value);
+  return value;
 }

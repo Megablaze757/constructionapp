@@ -7,8 +7,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "test": "node --test \"test/*.test.js\"",
-    "db:local": "wrangler d1 execute builderos-quoting --local --file=migrations/0001_init.sql && wrangler d1 execute builderos-quoting --local --file=migrations/0002_seed.sql",
-    "db:remote": "wrangler d1 execute builderos-quoting --remote --file=migrations/0001_init.sql && wrangler d1 execute builderos-quoting --remote --file=migrations/0002_seed.sql",
+    "db:local": "wrangler d1 execute builderos-quoting --local --file=migrations/0001_init.sql && wrangler d1 execute builderos-quoting --local --file=migrations/0002_seed.sql && wrangler d1 execute builderos-quoting --local --file=migrations/0003_phase_d.sql",
+    "db:remote": "wrangler d1 execute builderos-quoting --remote --file=migrations/0001_init.sql && wrangler d1 execute builderos-quoting --remote --file=migrations/0002_seed.sql && wrangler d1 execute builderos-quoting --remote --file=migrations/0003_phase_d.sql",
     "deploy": "wrangler deploy"
   },
   "devDependencies": {

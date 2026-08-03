@@ -1,5 +1,6 @@
 import './pwa.js';
 import { api, ownerToken, API_BASE, price, titleCase, esc, ApiError } from './api.js';
+import { initPhotos } from './photos.js';
 
 const $ = (id) => document.getElementById(id);
 const quoteId = new URLSearchParams(location.search).get('id');
@@ -31,6 +32,7 @@ async function boot() {
     const [loaded, book] = await Promise.all([api.getQuote(quoteId), api.priceBook()]);
     state.priceBook = book.price_book;
     apply(loaded);
+    initPhotos({ quoteId, onError: reportError });
     const { templates } = await api.templates();
     state.template = templates.find((t) => t.job_type === state.quote.job_type) || null;
   } catch (err) {
@@ -77,6 +79,12 @@ function renderAiSummary(summary) {
   }
   if (summary.assumptions?.length) {
     parts.push(`<div class="notice notice-warn" style="background:var(--surface-2);color:var(--ink-2)"><strong>Assumptions made</strong><ul>${list(summary.assumptions)}</ul></div>`);
+  }
+  if (summary.estimating_history?.length) {
+    // What the business's own completed jobs taught the assistant. The owner
+    // should see the same brief the model got, not just its output.
+    parts.push(`<div class="notice notice-warn"><strong>Your own job history says</strong><ul>${list(summary.estimating_history)}</ul>
+      <a href="variance.html">See the full quote-vs-actual report →</a></div>`);
   }
   if (summary.similar_past_jobs_reference?.length) {
     const rows = summary.similar_past_jobs_reference

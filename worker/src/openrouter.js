@@ -42,13 +42,17 @@ export function buildSystemPrompt() {
     '   owner must physically check in `flags_for_owner_review`.',
     '6. Use the recent similar jobs only to sanity-check that your quantities are',
     '   the right order of magnitude. Do not copy their numbers.',
+    '7. `estimating_history` reports where this business\'s own past estimates have',
+    '   drifted from what jobs actually cost. Where a line is listed as running',
+    '   over, scope it generously and say so in the note. It is measured history,',
+    '   not a hint — but it is about cost, so it never licenses you to output one.',
     '',
     'Be conservative. An under-scoped quote costs the business real money, and the',
     'owner reviews every line you produce before a client ever sees it.',
   ].join('\n');
 }
 
-export function buildUserPrompt({ description, template, priceBook, similarJobs }) {
+export function buildUserPrompt({ description, template, priceBook, similarJobs, estimatingHistory = [] }) {
   const lines = (template.line_items || []).map((li) => ({
     line_code: li.line_code,
     description: li.description,
@@ -75,6 +79,7 @@ export function buildUserPrompt({ description, template, priceBook, similarJobs 
       },
       available_line_codes: catalogue,
       recent_similar_jobs: similarJobs,
+      estimating_history: estimatingHistory,
     },
     null,
     2,
@@ -85,7 +90,7 @@ export function buildUserPrompt({ description, template, priceBook, similarJobs 
  * Ask the model for a draft.
  * @returns {Promise<{ok: true, draft: object, model: string} | {ok: false, error: string, detail?: any}>}
  */
-export async function requestDraft(env, { description, template, priceBook, similarJobs }) {
+export async function requestDraft(env, { description, template, priceBook, similarJobs, estimatingHistory }) {
   if (!env.OPENROUTER_API_KEY) {
     return { ok: false, error: 'OPENROUTER_API_KEY is not configured on the Worker.' };
   }
@@ -99,7 +104,10 @@ export async function requestDraft(env, { description, template, priceBook, simi
     temperature: 0.2,
     messages: [
       { role: 'system', content: buildSystemPrompt() },
-      { role: 'user', content: buildUserPrompt({ description, template, priceBook, similarJobs }) },
+      {
+        role: 'user',
+        content: buildUserPrompt({ description, template, priceBook, similarJobs, estimatingHistory }),
+      },
     ],
     response_format: {
       type: 'json_schema',

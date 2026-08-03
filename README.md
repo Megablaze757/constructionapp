@@ -7,7 +7,9 @@ delegation, client care, cash flow, and quoting, built so the business needs the
 
 The **auto-quoting module is built and deployable**: describe a job on site, get an
 AI-drafted quote, margin-check it, and send the client an interactive page they can
-accept from their phone. The rest of the system is specced but not yet built.
+accept from their phone. Log what the job actually cost and the system measures its
+own estimating drift, then briefs the next draft with it. The rest of the system is
+specced but not yet built.
 
 ## Architecture
 
@@ -25,8 +27,7 @@ margin calculation lives in the Worker. The browser is never trusted with money.
 
 ```bash
 cd worker && npm install
-npx wrangler d1 execute builderos-quoting --local --file=migrations/0001_init.sql
-npx wrangler d1 execute builderos-quoting --local --file=migrations/0002_seed.sql
+npm run db:local                       # create tables + starter templates
 npx wrangler dev                       # API on :8787
 node dev/stub-openrouter.js            # stands in for OpenRouter, no key needed
 cd ../web && python3 -m http.server 8788
@@ -45,6 +46,16 @@ cd worker && npm test                  # pricing, margin gate, and AI contract g
 - **[BuilderOS system spec](docs/builderos-system-spec.md)** — the whole system: features, modules, 12-month roadmap, KPIs
 - **[Auto-quoting module](docs/auto-quoting/README.md)** — the built module ([wireframes & AI spec](docs/auto-quoting/ui-and-ai-spec.md), [output schema](docs/auto-quoting/schemas/draft-quote.schema.json), [build status](docs/auto-quoting/README.md#12-build-status))
 - **[Deployment](docs/deployment.md)** — Pages, Cloudflare, OpenRouter, and local dev
+
+## Screens
+
+| Screen | What it does |
+| --- | --- |
+| `index.html` | Quotes list, start a new quote |
+| `builder.html` | Quote Builder — voice/typed brief, AI draft, margin gate, site photos, send |
+| `quote.html` | What the client gets: scope, photos, toggleable extras, Accept & Book |
+| `jobs.html` | Booked jobs; log what each one actually cost |
+| `variance.html` | Quote vs actual — per job, by job type, and per line |
 
 ## The rule the quoting module is built around
 

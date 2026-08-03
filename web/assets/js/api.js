@@ -77,6 +77,32 @@ export const api = {
       method: 'POST',
       body: overrideReason ? { override_reason: overrideReason } : {},
     }),
+
+  // Phase D
+  listJobs: () => request('/api/jobs'),
+  getJob: (id) => request(`/api/jobs/${id}`),
+  setJobStatus: (id, status) => request(`/api/jobs/${id}`, { method: 'PATCH', body: { status } }),
+  addCost: (id, cost) => request(`/api/jobs/${id}/costs`, { method: 'POST', body: cost }),
+  deleteCost: (id, costId) => request(`/api/jobs/${id}/costs/${costId}`, { method: 'DELETE' }),
+  variance: () => request('/api/reports/variance'),
+  photos: (quoteId) => request(`/api/quotes/${quoteId}/photos`),
+  addPhoto: (quoteId, photo) => request(`/api/quotes/${quoteId}/photos`, { method: 'POST', body: photo }),
+  deletePhoto: (quoteId, photoId) =>
+    request(`/api/quotes/${quoteId}/photos/${photoId}`, { method: 'DELETE' }),
+
+  /**
+   * Owner-side photo bytes as an object URL.
+   * An <img src> cannot carry an Authorization header, so the bytes are fetched
+   * here and handed to the tag as a blob — which also means a draft quote's
+   * photos never have to be exposed on the public route to be previewed.
+   */
+  async photoObjectUrl(quoteId, photoId) {
+    const res = await fetch(`${API_BASE}/api/quotes/${quoteId}/photos/${photoId}`, {
+      headers: { Authorization: `Bearer ${ownerToken.get()}` },
+    });
+    if (!res.ok) throw new ApiError(`Could not load photo (${res.status})`, res.status);
+    return URL.createObjectURL(await res.blob());
+  },
 };
 
 /* ------------------------------------------------------------------ client */
