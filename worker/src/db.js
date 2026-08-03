@@ -286,6 +286,47 @@ export async function allActualCosts(db) {
   return results ?? [];
 }
 
+/**
+ * Real quotes with their priced lines, for template-pattern detection.
+ * Drafts are excluded: a half-built quote is not evidence of anything.
+ */
+export async function quotesWithLines(db, limit = 200) {
+  const [{ results: quotes }, { results: lines }] = await Promise.all([
+    db.prepare(
+      `SELECT id, job_type, client_name FROM quotes
+        WHERE status IN ('sent','viewed','accepted') AND id NOT LIKE 'q_seed_%'
+        ORDER BY created_at DESC LIMIT ?1`,
+    ).bind(limit).all(),
+    db.prepare(
+      `SELECT li.quote_id, li.line_code, li.description, li.unit, li.quantity, li.kind,
+              (li.unit_price * li.quantity) AS line_price,
+              (li.unit_cost  * li.quantity) AS line_cost
+         FROM quote_line_items li
+         JOIN quotes q ON q.id = li.quote_id
+        WHERE q.status IN ('sent','viewed','accepted') AND q.id NOT LIKE 'q_seed_%'`,
+    ).all(),
+  ]);
+
+  const byQuote = new Map();
+  for (const l of lines ?? []) {
+    if (!byQuote.has(l.quote_id)) byQuote.set(l.quote_id, []);
+    byQuote.get(l.quote_id).push(l);
+  }
+  return (quotes ?? []).map((q) => ({ ...q, lines: byQuote.get(q.id) ?? [] }));
+}
+
+export async function createTemplate(db, tpl) {
+  await db.prepare(
+    `INSERT INTO quote_templates
+       (id, job_type, name, default_margin, margin_floor, validity_days, terms, exclusions, line_items, optional_extras)
+     VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)`,
+  ).bind(
+    tpl.id, tpl.job_type, tpl.name, tpl.default_margin, tpl.margin_floor,
+    tpl.validity_days ?? 30, tpl.terms ?? '', tpl.exclusions ?? '',
+    JSON.stringify(tpl.line_items ?? []), JSON.stringify(tpl.optional_extras ?? []),
+  ).run();
+}
+
 /* ------------------------------------------------------------------ photos */
 
 export async function listPhotos(db, quoteId, { clientOnly = false } = {}) {
@@ -299,6 +340,28 @@ export async function listPhotos(db, quoteId, { clientOnly = false } = {}) {
     .bind(quoteId)
     .all();
   return (results ?? []).map((p) => ({ ...p, show_client: !!p.show_client }));
+}
+
+/**
+ * Photos as base64, for a multimodal draft request.
+ *
+ * Capped rather than unbounded: images are the expensive part of a draft call,
+ * and the fifth photo of the same elevation adds cost without adding scope.
+ */
+export async function getPhotosForDraft(db, quoteId, limit = 4) {
+  const { results } = await db
+    .prepare('SELECT id, mime, bytes FROM quote_photos WHERE quote_id = ?1 ORDER BY position, rowid LIMIT ?2')
+    .bind(quoteId, limit)
+    .all();
+
+  return (results ?? []).map((r) => {
+    const bytes = toBytes(r.bytes);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    }
+    return { id: r.id, mime: r.mime, b64: btoa(binary) };
+  });
 }
 
 export async function getPhotoBytes(db, photoId) {

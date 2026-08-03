@@ -41,7 +41,7 @@ export async function downscale(file) {
 }
 
 /** Wire the photo card up to a quote. */
-export function initPhotos({ quoteId, onError, onBusy }) {
+export function initPhotos({ quoteId, onError, onBusy, onCount }) {
   const grid = document.getElementById('photo-grid');
   const input = document.getElementById('photo-input');
   const button = document.getElementById('photo-btn');
@@ -59,6 +59,7 @@ export function initPhotos({ quoteId, onError, onBusy }) {
   }
 
   async function render(photos) {
+    onCount?.(photos.length);
     // Release the previous batch; object URLs live until revoked.
     objectUrls.forEach(URL.revokeObjectURL);
     objectUrls = [];

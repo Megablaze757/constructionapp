@@ -5,11 +5,12 @@ delegation, client care, cash flow, and quoting, built so the business needs the
 
 > Comfort never builds anything great, but chaos doesn't scale — systems do.
 
-The **auto-quoting module is built and deployable**: describe a job on site, get an
-AI-drafted quote, margin-check it, and send the client an interactive page they can
-accept from their phone. Log what the job actually cost and the system measures its
-own estimating drift, then briefs the next draft with it. The rest of the system is
-specced but not yet built.
+The **auto-quoting module is built and deployable** — all four phases. Describe a job
+on site or photograph it, get an AI-drafted quote, margin-check it, and send the client
+an interactive page they can accept from their phone. Log what the job actually cost and
+the system measures its own estimating drift, then briefs the next draft with it. Quote
+the same shape of job often enough and it offers to save it as a template. The rest of
+the system is specced but not yet built.
 
 ## Architecture
 
@@ -60,11 +61,13 @@ cd worker && npm test                  # pricing, margin gate, and AI contract g
 ## The rule the quoting module is built around
 
 The AI drafts; it never prices and never sends. It returns quantities and honest
-provenance tags — what it was told, what it inferred, what came from the template —
-and the system prices those quantities from the price book. An inferred quantity
-can't claim high confidence, an unreviewed line can't be sent, and a quote below the
-margin floor can't go out without a logged reason. Those are enforced in the API,
-not just the UI, so skipping the app doesn't skip the gate.
+provenance tags — what it was told, what it worked out from the wording, what it
+scaled off a photo, what came from the template — and the system prices those
+quantities from the price book. An inferred quantity can't claim high confidence, a
+photo measurement can't be claimed when no photo was sent, an unreviewed line can't
+be sent, and a quote below the margin floor can't go out without a logged reason.
+Those are enforced in the API, not just the UI, so skipping the app doesn't skip the
+gate.
 
 ## Core principles
 

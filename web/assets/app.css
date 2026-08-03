@@ -277,6 +277,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .photo.photo-multi { grid-template-columns: 1fr 1fr; }
 .photo.photo-multi img { aspect-ratio: 1 / 1; }
 
+.inline-check {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 14px; color: var(--ink); font-weight: 500; cursor: pointer;
+}
+.inline-check input[type="checkbox"] { width: 22px; height: 22px; flex: none; accent-color: var(--brand); }
+
 /* Owner-side thumbnails in the builder. */
 .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
 .photo-thumb { margin: 0; display: grid; gap: 6px; }

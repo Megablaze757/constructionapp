@@ -44,6 +44,10 @@
       <label class="sr-only" for="description">Job description</label>
       <textarea id="description" placeholder="Rear scaffold, 2 lifts, roofer access, up 5 days"></textarea>
       <p class="muted" style="margin:0">Your own notes and the AI's input. The client never sees this.</p>
+      <label class="inline-check" id="use-photos-row" hidden>
+        <input type="checkbox" id="use-photos" checked>
+        <span>Let the AI look at your site photos <span class="muted" id="photo-count"></span></span>
+      </label>
       <button class="btn btn-primary" id="draft-btn" type="button">Generate Draft with AI</button>
     </div>
   </div>

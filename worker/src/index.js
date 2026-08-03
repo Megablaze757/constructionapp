@@ -13,6 +13,7 @@ import { requestDraft } from './openrouter.js';
 import {
   jobVariance, byJobType, lineCodeBias, biasBriefing, summarise,
 } from './variance.js';
+import { suggestTemplates } from './templates.js';
 import * as db from './db.js';
 
 /** Cap on a single uploaded photo, after the browser has downscaled it. */
@@ -56,8 +57,70 @@ async function ownerRoutes(path, request, env, ctxo) {
   const [, resource, id, action, subId] = seg;
   const method = request.method;
 
-  if (resource === 'templates' && method === 'GET') {
+  if (resource === 'templates' && !id && method === 'GET') {
     return json({ templates: await db.getTemplates(D1) }, ctxo);
+  }
+
+  if (resource === 'templates' && id === 'suggestions' && method === 'GET') {
+    const [quotes, templates] = await Promise.all([
+      db.quotesWithLines(D1),
+      db.getTemplates(D1),
+    ]);
+    return json({ suggestions: suggestTemplates(quotes, templates) }, ctxo);
+  }
+
+  // Accept a suggestion (or create a template outright).
+  if (resource === 'templates' && !id && method === 'POST') {
+    const body = await readJson(request);
+    const jobType = String(body.job_type || '').trim();
+    const name = String(body.name || '').trim();
+    if (!/^[a-z0-9]+(_[a-z0-9]+)*$/.test(jobType)) {
+      return fail(400, 'job_type must be snake_case', {}, ctxo);
+    }
+    if (!name) return fail(400, 'name is required', {}, ctxo);
+    if (!Array.isArray(body.line_items) || !body.line_items.length) {
+      return fail(400, 'line_items[] is required', {}, ctxo);
+    }
+    if (await db.getTemplate(D1, jobType)) {
+      return fail(409, `A template for "${jobType}" already exists.`, {}, ctxo);
+    }
+
+    // Every line must resolve to the price book, for the same reason the AI's
+    // line_code is checked: a template is what the assistant is allowed to draw
+    // on, so an unknown code here would become an unpriceable quote later.
+    const book = db.priceBookMap(await db.getPriceBook(D1));
+    const unknown = body.line_items.filter((li) => !book.has(li.line_code));
+    if (unknown.length) {
+      return fail(400, `Unknown price book codes: ${unknown.map((u) => u.line_code).join(', ')}`, {}, ctxo);
+    }
+
+    const margin = Number(body.default_margin);
+    const floor = Number(body.margin_floor);
+    if (!Number.isFinite(margin) || !Number.isFinite(floor) || floor > margin) {
+      return fail(400, 'default_margin and margin_floor must be numbers, with the floor at or below the target', {}, ctxo);
+    }
+
+    const tpl = {
+      id: newId('tpl'),
+      job_type: jobType,
+      name,
+      default_margin: margin,
+      margin_floor: floor,
+      validity_days: Number(body.validity_days) || 30,
+      terms: body.terms ?? '',
+      exclusions: body.exclusions ?? '',
+      line_items: body.line_items.map((li) => ({
+        line_code: li.line_code,
+        description: li.description || book.get(li.line_code).description,
+        unit: li.unit || book.get(li.line_code).unit,
+        default_quantity: li.default_quantity ?? null,
+        always_include: li.always_include !== false,
+        locked: !!li.locked,
+      })),
+      optional_extras: body.optional_extras ?? [],
+    };
+    await db.createTemplate(D1, tpl);
+    return json({ template: tpl }, { ...ctxo, status: 201 });
   }
 
   if (resource === 'pricebook' && method === 'GET') {
@@ -244,11 +307,16 @@ async function draftQuote(row, request, env, ctxo) {
   const template = await db.getTemplate(D1, row.job_type);
   if (!template) return fail(400, 'Template missing for this quote.', {}, ctxo);
 
-  const [book, similar, quotedLines, actualCosts] = await Promise.all([
+  // Photos cost tokens on every draft, so the owner decides per draft. Default is
+  // on when photos exist — having uploaded them, that is the expected behaviour.
+  const usePhotos = body.use_photos !== false;
+
+  const [book, similar, quotedLines, actualCosts, photos] = await Promise.all([
     db.getPriceBook(D1),
     db.similarPastJobs(D1, row.job_type),
     db.quotedLinesForCompletedJobs(D1),
     db.allActualCosts(D1),
+    usePhotos ? db.getPhotosForDraft(D1, row.id) : Promise.resolve([]),
   ]);
 
   // The learning loop: measured drift between what this business quoted and what
@@ -261,6 +329,7 @@ async function draftQuote(row, request, env, ctxo) {
     priceBook: book,
     similarJobs: similar,
     estimatingHistory,
+    photos,
   });
   if (!result.ok) {
     await db.logEvent(D1, row.id, 'ai_draft_failed', { error: result.error });
@@ -286,9 +355,9 @@ async function draftQuote(row, request, env, ctxo) {
       source: li.source,
       confidence: li.confidence,
       note: li.note ?? null,
-      // The tap-to-confirm gate: anything the AI inferred lands unconfirmed and
-      // shows an amber dot until the owner taps it.
-      confirmed: li.source !== 'ai_inferred' && li.confidence === 'high',
+      // The tap-to-confirm gate: anything the AI inferred — from the wording or
+      // from a photo — lands unconfirmed and shows an amber dot until tapped.
+      confirmed: !['ai_inferred', 'photo_inferred'].includes(li.source) && li.confidence === 'high',
       locked: false,
       position: i,
     }))
@@ -303,6 +372,7 @@ async function draftQuote(row, request, env, ctxo) {
     flags_for_owner_review: result.draft.flags_for_owner_review,
     similar_past_jobs_reference: similar,
     estimating_history: estimatingHistory,
+    photos_used: result.photos_used,
     model: result.model,
     drafted_at: new Date().toISOString(),
   };

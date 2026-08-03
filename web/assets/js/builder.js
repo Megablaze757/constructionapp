@@ -32,7 +32,16 @@ async function boot() {
     const [loaded, book] = await Promise.all([api.getQuote(quoteId), api.priceBook()]);
     state.priceBook = book.price_book;
     apply(loaded);
-    initPhotos({ quoteId, onError: reportError });
+    // The photo toggle only appears once there is something to look at, and
+    // stays in sync as photos are added or removed.
+    initPhotos({
+      quoteId,
+      onError: reportError,
+      onCount: (n) => {
+        $('use-photos-row').hidden = n === 0;
+        $('photo-count').textContent = n ? `(${n})` : '';
+      },
+    });
     const { templates } = await api.templates();
     state.template = templates.find((t) => t.job_type === state.quote.job_type) || null;
   } catch (err) {
@@ -113,16 +122,20 @@ function renderLines() {
 function lineMarkup(l) {
   // "AI est." means the quantity is the AI's estimate. A quantity the owner
   // actually stated is not an estimate just because the AI transcribed it, so
-  // only ai_inferred lines carry the tag — matching the wireframe, where hire
+  // only inferred lines carry a tag — matching the wireframe, where hire
   // (5 days, stated) is untagged and erect (45m², inferred) is tagged.
-  const isAi = l.source === 'ai_inferred';
+  // Photo-scaled lines get their own tag: "measured off a picture" is a
+  // different claim from "worked out from the wording", and the owner checking
+  // this on site needs to know which one they are looking at.
+  const tag = l.source === 'photo_inferred' ? '📷 from photo'
+    : l.source === 'ai_inferred' ? '🤖 AI est.' : null;
   const unconfirmed = !l.confirmed;
   return `
     <div class="line ${unconfirmed ? 'unconfirmed' : ''}">
       <div class="line-desc">
         ${unconfirmed ? '<span class="dot" title="Not yet confirmed"></span>' : ''}
         <span>${esc(l.description)}</span>
-        ${isAi ? '<span class="tag tag-ai">🤖 AI est.</span>' : ''}
+        ${tag ? `<span class="tag tag-ai">${esc(tag)}</span>` : ''}
       </div>
       <div class="line-price">${price(l.line_price)}</div>
       <div class="line-qty">${formatQty(l.quantity)} ${esc(l.unit)}${l.unit_price ? ` @ ${price(l.unit_price)}` : ''}</div>
@@ -258,7 +271,7 @@ $('draft-btn').addEventListener('click', async (e) => {
   btn.innerHTML = '<span class="spinner"></span> Drafting…';
   clearBanner();
   try {
-    apply(await api.draft(quoteId, description));
+    apply(await api.draft(quoteId, description, $('use-photos').checked));
     banner('warn', '<strong>Draft ready.</strong> Items marked 🤖 need a tap to confirm before you can send.');
   } catch (err) {
     if (err instanceof ApiError && err.status === 502) {

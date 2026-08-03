@@ -21,7 +21,25 @@
  */
 
 export const CONFIDENCE = ['high', 'medium', 'low'];
-export const AI_SOURCES = ['explicit_in_description', 'ai_inferred', 'template_default'];
+
+/**
+ * Provenance of a drafted quantity.
+ *
+ * `photo_inferred` is separate from `ai_inferred` on purpose: "I measured this off
+ * a picture" is a different kind of claim from "I worked it out from the wording",
+ * and an owner checking a quote on site needs to know which one they are looking
+ * at. It is also the only way to catch a model claiming to have read a photo that
+ * was never sent.
+ */
+export const AI_SOURCES = [
+  'explicit_in_description',
+  'ai_inferred',
+  'photo_inferred',
+  'template_default',
+];
+
+/** Sources that are the model's own estimate rather than something it was told. */
+export const INFERRED_SOURCES = ['ai_inferred', 'photo_inferred'];
 
 /** Sent to OpenRouter as response_format.json_schema.schema (strict: true). */
 export const WIRE_SCHEMA = {
@@ -78,7 +96,7 @@ export const WIRE_SCHEMA = {
  * @param {Set<string>} allowedCodes  line_codes the matched template permits
  * @returns {{ok: true, value: object} | {ok: false, errors: string[]}}
  */
-export function validateDraft(draft, allowedCodes) {
+export function validateDraft(draft, allowedCodes, { photosProvided = false } = {}) {
   const errors = [];
   const bad = (m) => errors.push(m);
 
@@ -170,15 +188,21 @@ export function validateDraft(draft, allowedCodes) {
       bad(`${at}.note must be a string or null`);
     }
     // Guardrail: inference is by definition not stated, so it cannot be high.
-    if (item.source === 'ai_inferred' && item.confidence === 'high') {
-      bad(`${at} is ai_inferred and cannot claim confidence "high"`);
+    // A quantity scaled off a photograph is an estimate twice over.
+    if (INFERRED_SOURCES.includes(item.source) && item.confidence === 'high') {
+      bad(`${at} is ${item.source} and cannot claim confidence "high"`);
     }
     // Guardrail: anything the owner has to judge must explain itself.
     if ((item.confidence === 'medium' || item.confidence === 'low') && !hasNote) {
       bad(`${at} has confidence "${item.confidence}" and must carry a note`);
     }
-    if (item.source === 'ai_inferred' && !hasNote) {
-      bad(`${at} is ai_inferred and must carry a note`);
+    if (INFERRED_SOURCES.includes(item.source) && !hasNote) {
+      bad(`${at} is ${item.source} and must carry a note`);
+    }
+    // Guardrail: the model cannot claim it measured something off a photograph
+    // when no photograph was sent.
+    if (item.source === 'photo_inferred' && !photosProvided) {
+      bad(`${at} claims photo_inferred but no photos were supplied with this draft`);
     }
   });
 

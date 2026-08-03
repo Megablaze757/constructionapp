@@ -63,13 +63,16 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
 export const api = {
   health: () => request('/health', { auth: false }),
   templates: () => request('/api/templates'),
+  templateSuggestions: () => request('/api/templates/suggestions'),
+  createTemplate: (tpl) => request('/api/templates', { method: 'POST', body: tpl }),
   priceBook: () => request('/api/pricebook'),
   listQuotes: () => request('/api/quotes'),
   createQuote: (data) => request('/api/quotes', { method: 'POST', body: data }),
   getQuote: (id) => request(`/api/quotes/${id}`),
   patchQuote: (id, data) => request(`/api/quotes/${id}`, { method: 'PATCH', body: data }),
   deleteQuote: (id) => request(`/api/quotes/${id}`, { method: 'DELETE' }),
-  draft: (id, description) => request(`/api/quotes/${id}/draft`, { method: 'POST', body: { description } }),
+  draft: (id, description, usePhotos = true) =>
+    request(`/api/quotes/${id}/draft`, { method: 'POST', body: { description, use_photos: usePhotos } }),
   putLines: (id, lines) => request(`/api/quotes/${id}/lines`, { method: 'PUT', body: { lines } }),
   confirmAll: (id) => request(`/api/quotes/${id}/lines/confirm-all`, { method: 'POST' }),
   send: (id, overrideReason) =>

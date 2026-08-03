@@ -2,10 +2,16 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://constructionapp.local/schemas/draft-quote.schema.json",
   "title": "Draft Quote Object",
-  "description": "Output contract for the AI draft assistant. The model returns scope and quantities only — prices are applied by the app from the PriceBook after validation, so the model has no path to inventing a number that reaches a client.",
+  "description": "Output contract for the AI draft assistant. The model returns scope and quantities only \u2014 prices are applied by the app from the PriceBook after validation, so the model has no path to inventing a number that reaches a client.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["job_type", "confidence", "line_items", "assumptions", "flags_for_owner_review"],
+  "required": [
+    "job_type",
+    "confidence",
+    "line_items",
+    "assumptions",
+    "flags_for_owner_review"
+  ],
   "properties": {
     "job_type": {
       "type": "string",
@@ -20,37 +26,58 @@
       "type": "array",
       "description": "Drafted line items, each traceable to the input, the template, or an inference.",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/lineItem" }
+      "items": {
+        "$ref": "#/$defs/lineItem"
+      }
     },
     "assumptions": {
       "type": "array",
       "description": "Everything the draft takes for granted that was not stated in the input. Empty array if none.",
-      "items": { "type": "string", "minLength": 1 }
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
     "flags_for_owner_review": {
       "type": "array",
       "description": "Points the owner must actively check before sending. Empty array if none.",
-      "items": { "type": "string", "minLength": 1 }
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
     "similar_past_jobs_reference": {
       "type": "array",
       "description": "Completed jobs supplied to the model as scale sanity-check, echoed back to show what the estimate was compared against.",
-      "items": { "$ref": "#/$defs/pastJobReference" }
+      "items": {
+        "$ref": "#/$defs/pastJobReference"
+      }
     }
   },
   "$defs": {
     "confidence": {
       "type": "string",
-      "enum": ["high", "medium", "low"]
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ]
     },
     "lineItem": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["line_code", "description", "quantity_estimate", "unit", "source", "confidence"],
+      "required": [
+        "line_code",
+        "description",
+        "quantity_estimate",
+        "unit",
+        "source",
+        "confidence"
+      ],
       "properties": {
         "line_code": {
           "type": "string",
-          "description": "Identifier of the line in the matched QuoteTemplate, which resolves to a PriceBook entry. Constrained at runtime to the codes the matched template offers, so the model cannot invent a line — and therefore cannot invent a price by inventing a product.",
+          "description": "Identifier of the line in the matched QuoteTemplate, which resolves to a PriceBook entry. Constrained at runtime to the codes the matched template offers, so the model cannot invent a line \u2014 and therefore cannot invent a price by inventing a product.",
           "pattern": "^[a-z0-9]+(_[a-z0-9]+)*$"
         },
         "description": {
@@ -61,52 +88,114 @@
         "quantity_estimate": {
           "type": "number",
           "exclusiveMinimum": 0,
-          "description": "Quantity only. No price, rate, or total — the app derives cost from the PriceBook."
+          "description": "Quantity only. No price, rate, or total \u2014 the app derives cost from the PriceBook."
         },
         "unit": {
           "type": "string",
           "minLength": 1,
           "description": "Unit of measure, e.g. m2, days, job, each.",
-          "examples": ["m2", "days", "job", "each", "hours", "m"]
+          "examples": [
+            "m2",
+            "days",
+            "job",
+            "each",
+            "hours",
+            "m"
+          ]
         },
         "source": {
           "type": "string",
-          "description": "Where the quantity came from. Drives the amber-dot / tap-to-confirm rule in the Quote Builder.",
-          "enum": ["explicit_in_description", "ai_inferred", "template_default"]
+          "description": "Where the quantity came from. Drives the amber-dot / tap-to-confirm rule in the Quote Builder. `photo_inferred` means it was scaled off an attached site photo, and is only valid when photos were actually supplied with the request.",
+          "enum": [
+            "explicit_in_description",
+            "ai_inferred",
+            "photo_inferred",
+            "template_default"
+          ]
         },
-        "confidence": { "$ref": "#/$defs/confidence" },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        },
         "note": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "minLength": 1,
-          "description": "Context the owner needs to judge the number. Required when source is ai_inferred or confidence is not high."
+          "description": "Context the owner needs to judge the number. Required when the source is inferred (ai_inferred or photo_inferred) or the confidence is not high. For photo_inferred, say what the quantity was scaled against."
         }
       },
       "allOf": [
         {
-          "$comment": "An inferred quantity is never high confidence — inference is by definition not stated.",
+          "$comment": "An inferred quantity is never high confidence \u2014 inference is by definition not stated, and a quantity scaled off a photograph is an estimate twice over.",
           "if": {
-            "properties": { "source": { "const": "ai_inferred" } },
-            "required": ["source"]
+            "properties": {
+              "source": {
+                "enum": [
+                  "ai_inferred",
+                  "photo_inferred"
+                ]
+              }
+            },
+            "required": [
+              "source"
+            ]
           },
           "then": {
-            "properties": { "confidence": { "enum": ["medium", "low"] } },
-            "required": ["note"]
+            "properties": {
+              "confidence": {
+                "enum": [
+                  "medium",
+                  "low"
+                ]
+              },
+              "note": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "note"
+            ]
           }
         },
         {
           "$comment": "Anything below high confidence must explain itself to the owner.",
           "if": {
-            "properties": { "confidence": { "enum": ["medium", "low"] } },
-            "required": ["confidence"]
+            "properties": {
+              "confidence": {
+                "enum": [
+                  "medium",
+                  "low"
+                ]
+              }
+            },
+            "required": [
+              "confidence"
+            ]
           },
-          "then": { "required": ["note"] }
+          "then": {
+            "properties": {
+              "note": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "note"
+            ]
+          }
         }
       ]
     },
     "pastJobReference": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["job", "quoted", "actual_cost"],
+      "required": [
+        "job",
+        "quoted",
+        "actual_cost"
+      ],
       "properties": {
         "job": {
           "type": "string",

@@ -60,7 +60,12 @@ appraisal) and the **Job Management Module** (booked job).
 - **Pre-built starter templates** by trade — scaffolding, roofing, groundworks, extensions, etc.
 - **Owner-created templates** — save any quote as a reusable template
 - **AI-suggested templates** — after enough quotes, the system suggests "you quote this job type
-  often, want to save it as a template?"
+  often, want to save it as a template?" The signal is the *shape* of a quote: which price-book
+  lines it draws on. When the same combination is assembled by hand three or more times and no
+  template's always-include lines already produce it, that combination has become a job type the
+  business does regularly, whether or not anyone has named it. Default quantities come from the
+  **median** of past quotes, so one freak 200m² job cannot set the norm, and the suggested margin
+  is what the business actually achieved on them, floored to a whole point
 
 ### 3.3 Template Management
 
@@ -76,8 +81,10 @@ appraisal) and the **Job Management Module** (booked job).
 
 - **Typed description** — "Erect scaffold to rear of 3-bed semi, 2 lifts, access for roofers"
 - **Voice note** — owner describes the job on-site, walking the property
-- **Photos** — uploaded site photos; AI estimates scale/scope where possible, always flagged as
-  an estimate and never final
+- **Photos** — uploaded site photos; the assistant scales quantities off them where it can, always
+  flagged as `photo_inferred` and never final. It is told to scale against something of known size
+  in the frame — a storey, a door, a brick course — and to say in the note what it used, so the
+  owner can check the reasoning on site
 - **Past similar jobs** — AI cross-references similar completed jobs for a pricing sanity-check
 
 ### 4.2 What It Produces
@@ -99,6 +106,11 @@ The exact prompt structure and output schema are in
 - **Margin floor** — if a draft would send below the minimum margin threshold, it's flagged red
   before it can be sent
 - Owner can **lock** certain line items (e.g. day rate) so AI never overrides them
+- **Photos are opt-out per draft.** They cost tokens on every call, so the builder shows a toggle
+  once photos exist. The assistant is told a photo shows one elevation and hides the rest, and to
+  raise what it cannot see in `flags_for_owner_review` rather than assuming
+- **A photo claim is checked against reality.** `photo_inferred` is rejected outright when no
+  photo was sent with the request, so a guess cannot be relabelled as a measurement
 
 ---
 
@@ -303,6 +315,7 @@ a caller cannot route around:
 | --- | --- |
 | The AI cannot return a price | The wire schema has no price field, and unknown properties are rejected — `worker/src/schema.js` |
 | The AI cannot invent a line item | `line_code` is checked against the matched template's codes |
+| The AI cannot claim to have measured a photo it never saw | `photo_inferred` is refused unless photos were actually sent with the request |
 | An inferred quantity cannot claim high confidence | `validateDraft()`, which also requires a note on anything below high |
 | A failed draft changes nothing | The Worker rejects the response instead of repairing it; the quote is left as it was |
 | AI-drafted lines cannot be sent unreviewed | `sendBlockers()` — the API returns 422, so skipping the UI does not skip the gate |
@@ -320,14 +333,14 @@ a caller cannot route around:
 | **A — Templates + manual quoting** | Built. Two starter templates, price book, margin display, shareable link. |
 | **B — Interactive client quote** | Built. Toggleable extras with live totals, Accept & Book creating a job, engagement events (`opened`, `extra_toggled`, `accepted`, `question_asked`). |
 | **C — AI draft assistant** | Built. Typed or dictated description → draft line items, assumptions, flags, confidence, tap-to-confirm. |
-| **D — Photo estimating & learning loop** | Mostly built. Site photo upload, cost capture against jobs, the quote-vs-actual variance report, and the [learning loop](#9a-the-learning-loop-phase-d-built) all work. Photo-based *scope estimating* and automatic template suggestions do not. |
+| **D — Photo estimating & learning loop** | Built. Site photos are uploaded, shown to the client, and read by the assistant to scale quantities; costs are captured against jobs; the [learning loop](#9a-the-learning-loop-phase-d-built) feeds measured drift back into drafting; and recurring quote shapes are offered as new templates. |
 
-Known gaps, deliberately left:
+All four phases of the module are now built. Known gaps, deliberately left:
 
-- **Photos are stored but not read by the AI.** Upload, downscaling, and display on
-  the client quote work; a vision model inferring scope *from* a photo does not.
-  That is the remaining half of Phase D.
-- **No automatic template suggestions** from recurring quote patterns.
+- **Photo estimating is only as good as the photo.** The assistant is told to scale
+  against something of known size and to flag what the frame cannot show, but a
+  single elevation genuinely cannot reveal a rear extension. Photo-scaled lines
+  land unconfirmed for exactly this reason.
 - **Voice notes use the browser's Web Speech API**, which Chrome and Safari support
   and Firefox does not. The button says so rather than failing quietly. A
   server-side transcription service would remove the browser dependency.

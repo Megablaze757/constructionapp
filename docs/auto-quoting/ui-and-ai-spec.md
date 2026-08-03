@@ -215,7 +215,8 @@ merely instructed.
 | --- | --- |
 | `line_code` | The template line this maps to, which resolves to a `PriceBook` entry. Constrained at runtime to the codes the matched template offers |
 | `source: explicit_in_description` | Stated outright in the input — safe to trust |
-| `source: ai_inferred` | Derived, not stated — always needs owner confirmation |
+| `source: ai_inferred` | Derived from the wording, not stated — always needs owner confirmation |
+| `source: photo_inferred` | Scaled off an attached site photo. Only valid when photos were actually supplied, and the note must say what it scaled against |
 | `source: template_default` | Pulled from the `QuoteTemplate`, not the input |
 | `confidence` | `high` / `medium` / `low`, per item and for the draft overall |
 | `note` | Required whenever the owner needs context to judge the number |
@@ -239,6 +240,16 @@ pass is for, and it is the reason the guardrails live in code rather than in the
 asks, a validator refuses. A draft that fails validation is **rejected outright** rather than
 repaired — silently fixing it would put an unlabelled number in front of the owner, which is the
 one thing the `source`/`confidence` tags exist to prevent.
+
+Two of the rules depend on context the published schema cannot know, so they live only in the
+validator: whether a `line_code` is one the matched template offers, and whether any photo was
+actually attached. The second matters more than it looks — without it, a text-only draft could
+launder a guess as a measurement by labelling it `photo_inferred`.
+
+**On nullable notes.** Strict mode has no optional properties, so a high-confidence line
+legitimately comes back as `note: null`. The published schema therefore accepts `null` at the
+property level, while the conditional branches require a non-empty string — so a null can never
+satisfy a rule that demands an explanation.
 
 ### 2.4 Why Structured Output Matters Here
 

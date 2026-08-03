@@ -54,16 +54,31 @@ const server = createServer((req, res) => {
       return;
     }
 
-    const userMsg = payload.messages?.find((m) => m.role === 'user')?.content ?? '{}';
+    // A multimodal request sends content as an array of text and image parts.
+    const content = payload.messages?.find((m) => m.role === 'user')?.content ?? '{}';
+    const parts = Array.isArray(content) ? content : [{ type: 'text', text: content }];
+    const images = parts.filter((p) => p.type === 'image_url');
+    const text = parts.find((p) => p.type === 'text')?.text ?? '{}';
+
     let ctx = {};
     try {
-      ctx = JSON.parse(userMsg);
+      ctx = JSON.parse(text);
     } catch { /* leave empty */ }
 
-    const codes = (ctx.matched_template?.line_items ?? []).map((l) => l.line_code);
-    console.log(`[stub] drafting for "${(ctx.job_description || '').slice(0, 60)}" with codes: ${codes.join(', ')}`);
+    // The Worker should never say photos are attached when they are not.
+    if ((ctx.site_photos_attached ?? 0) !== images.length) {
+      console.error(`[stub] REJECTED: prompt says ${ctx.site_photos_attached} photos, request carried ${images.length}`);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: { message: 'photo count mismatch between prompt and payload' } }));
+      return;
+    }
 
-    const draft = MODE === 'bad' ? badDraft(codes) : goodDraft(codes, ctx);
+    const codes = (ctx.matched_template?.line_items ?? []).map((l) => l.line_code);
+    console.log(`[stub] drafting for "${(ctx.job_description || '').slice(0, 50)}" · ${images.length} photo(s) · codes: ${codes.join(', ')}`);
+
+    const draft = MODE === 'bad' ? badDraft(codes)
+      : MODE === 'photo-liar' ? photoLiarDraft(codes)
+        : goodDraft(codes, ctx, images.length);
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
@@ -76,12 +91,22 @@ const server = createServer((req, res) => {
 });
 
 /** The worked example from docs/auto-quoting/ui-and-ai-spec.md §2.5. */
-function goodDraft(codes, ctx) {
+function goodDraft(codes, ctx, photoCount = 0) {
   const has = (c) => codes.includes(c);
   const items = [];
 
   if (has('scaffold_erect')) {
-    items.push({
+    // With a photo to look at, the erect line is scaled off the elevation rather
+    // than guessed from the wording — a different provenance, still an estimate.
+    items.push(photoCount > 0 ? {
+      line_code: 'scaffold_erect',
+      description: 'Scaffold erect',
+      quantity_estimate: 48,
+      unit: 'm2',
+      source: 'photo_inferred',
+      confidence: 'medium',
+      note: 'Scaled off the rear elevation photo against the door height — roughly 8m wide by 6m to eaves. Confirm on site.',
+    } : {
       line_code: 'scaffold_erect',
       description: 'Scaffold erect',
       quantity_estimate: 45,
@@ -133,10 +158,35 @@ function goodDraft(codes, ctx) {
       'Assumed standard domestic access scaffold, not industrial',
       'Assumed no special permit/road closure required — not mentioned',
     ],
-    flags_for_owner_review: [
-      'Scaffold m² is an estimate — confirm before sending',
-      'No mention of ground conditions — confirm access is clear',
-    ],
+    flags_for_owner_review: photoCount > 0
+      ? [
+        'Scaffold m² was scaled off a photo — measure before sending',
+        'Photo shows the rear elevation only; the sides are not visible',
+        'No mention of ground conditions — confirm access is clear',
+      ]
+      : [
+        'Scaffold m² is an estimate — confirm before sending',
+        'No mention of ground conditions — confirm access is clear',
+      ],
+  };
+}
+
+/** Claims to have measured a photo that was never attached. */
+function photoLiarDraft(codes) {
+  return {
+    job_type: 'domestic_scaffold_erect',
+    confidence: 'medium',
+    line_items: [{
+      line_code: codes[0] || 'scaffold_erect',
+      description: 'Scaffold erect',
+      quantity_estimate: 48,
+      unit: 'm2',
+      source: 'photo_inferred',
+      confidence: 'medium',
+      note: 'Scaled off the site photo against the door height',
+    }],
+    assumptions: [],
+    flags_for_owner_review: [],
   };
 }
 

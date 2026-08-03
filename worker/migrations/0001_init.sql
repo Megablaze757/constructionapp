@@ -97,7 +97,7 @@ CREATE TABLE quote_line_items (
   selected    INTEGER NOT NULL DEFAULT 0,    -- extras only: client toggled it on
   -- Provenance, straight from the AI output contract.
   source      TEXT NOT NULL DEFAULT 'owner_entered'
-              CHECK (source IN ('owner_entered','explicit_in_description','ai_inferred','template_default')),
+              CHECK (source IN ('owner_entered','explicit_in_description','ai_inferred','photo_inferred','template_default')),
   confidence  TEXT CHECK (confidence IN ('high','medium','low')),
   note        TEXT,
   -- The tap-to-confirm gate. AI-sourced lines land unconfirmed (amber dot).

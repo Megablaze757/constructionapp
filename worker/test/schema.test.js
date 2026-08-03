@@ -89,11 +89,27 @@ test('validator agrees with the published JSON Schema across the case corpus', (
     ['margin_actual missing its % sign', mutate((d) => { d.similar_past_jobs_reference[0].margin_actual = '22'; })],
     ['unexpected top-level key', mutate((d) => { d.total_price = 1835; })],
     ['assumptions containing a non-string', mutate((d) => { d.assumptions = [42]; })],
+    ['photo-derived line', mutate((d) => { d.line_items[0] = photoLine(); })],
+    ['photo-derived line claiming high confidence',
+      mutate((d) => { d.line_items[0] = photoLine({ confidence: 'high' }); })],
+    ['photo-derived line with no note',
+      mutate((d) => { d.line_items[0] = photoLine({ note: null }); })],
+    // The wire schema makes `note` nullable because strict mode has no optional
+    // properties, so a high-confidence line really does come back as null. The
+    // published contract must accept that without letting null count as a note
+    // where one is required.
+    ['null note on a high-confidence line', mutate((d) => { d.line_items[1].note = null; })],
+    ['null note on a medium-confidence line',
+      mutate((d) => { d.line_items[1].confidence = 'medium'; d.line_items[1].note = null; })],
+    ['empty-string note where one is required',
+      mutate((d) => { d.line_items[0].note = ''; })],
   ];
 
   for (const [name, doc] of cases) {
     const bySchema = check(doc);
-    const byValidator = validateDraft(doc, CODES).ok;
+    // Photos-provided, because "did a photo exist" is context the published
+    // schema cannot know — the same reason line_code membership is excluded.
+    const byValidator = validateDraft(doc, CODES, { photosProvided: true }).ok;
     assert.equal(
       byValidator,
       bySchema,
@@ -107,6 +123,75 @@ test('validator agrees with the published JSON Schema across the case corpus', (
     return d;
   }
 });
+
+/* ------------------------------------------------- photo-based estimating */
+
+const photoLine = (over = {}) => ({
+  line_code: 'scaffold_erect',
+  description: 'Scaffold erect',
+  quantity_estimate: 48,
+  unit: 'm2',
+  source: 'photo_inferred',
+  confidence: 'medium',
+  note: 'Scaled off the rear elevation photo against the door height — confirm on site',
+  ...over,
+});
+
+const withPhotoLine = (over = {}) => {
+  const d = clone(SPEC_EXAMPLE);
+  d.line_items[0] = photoLine(over);
+  return d;
+};
+
+test('a photo-derived quantity is accepted when photos were supplied', () => {
+  const res = validateDraft(withPhotoLine(), CODES, { photosProvided: true });
+  assert.equal(res.ok, true, JSON.stringify(res.errors));
+});
+
+test('the model cannot claim it read a photo that was never sent', () => {
+  // Without this, a text-only draft could launder a guess as a measurement.
+  const res = validateDraft(withPhotoLine(), CODES, { photosProvided: false });
+  assert.equal(res.ok, false);
+  assert.match(res.errors.join(' '), /no photos were supplied/);
+});
+
+test('photos default to absent, so photo_inferred is refused unless asked for', () => {
+  assert.equal(validateDraft(withPhotoLine(), CODES).ok, false);
+});
+
+test('a quantity scaled off a photo can never be high confidence', () => {
+  const res = validateDraft(
+    withPhotoLine({ confidence: 'high' }), CODES, { photosProvided: true },
+  );
+  assert.equal(res.ok, false);
+  assert.match(res.errors.join(' '), /photo_inferred and cannot claim confidence "high"/);
+});
+
+test('a photo-derived line must say what it was scaled against', () => {
+  const res = validateDraft(
+    withPhotoLine({ note: null }), CODES, { photosProvided: true },
+  );
+  assert.equal(res.ok, false);
+  assert.match(res.errors.join(' '), /photo_inferred and must carry a note/);
+});
+
+test('supplying photos does not weaken any other rule', () => {
+  const res = validateDraft(
+    withPhotoLine({ line_code: 'helicopter_hire' }), CODES, { photosProvided: true },
+  );
+  assert.equal(res.ok, false);
+  assert.match(res.errors.join(' '), /not in the matched template/);
+});
+
+test('the model cannot price a line just because it saw a photo', () => {
+  const d = withPhotoLine();
+  d.line_items[0].unit_price = 27;
+  const res = validateDraft(d, CODES, { photosProvided: true });
+  assert.equal(res.ok, false);
+  assert.match(res.errors.join(' '), /unexpected property "unit_price"/);
+});
+
+/* ------------------------------------------------------------------------ */
 
 test('the model cannot invent a line the template does not offer', () => {
   const d = clone(SPEC_EXAMPLE);
