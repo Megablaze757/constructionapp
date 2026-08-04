@@ -93,6 +93,29 @@ export const api = {
   deletePhoto: (quoteId, photoId) =>
     request(`/api/quotes/${quoteId}/photos/${photoId}`, { method: 'DELETE' }),
 
+  // Phase 0 — team, SOPs, invoicing
+  createJob: (job) => request('/api/jobs', { method: 'POST', body: job }),
+  patchJob: (id, data) => request(`/api/jobs/${id}`, { method: 'PATCH', body: data }),
+  people: (all = false) => request(`/api/people${all ? '?all' : ''}`),
+  addPerson: (p) => request('/api/people', { method: 'POST', body: p }),
+  patchPerson: (id, p) => request(`/api/people/${id}`, { method: 'PATCH', body: p }),
+  deactivatePerson: (id) => request(`/api/people/${id}`, { method: 'DELETE' }),
+  sops: () => request('/api/sops'),
+  addSop: (s) => request('/api/sops', { method: 'POST', body: s }),
+  assignCrew: (jobId, person_id, role_on_job) =>
+    request(`/api/jobs/${jobId}/crew`, { method: 'POST', body: { person_id, role_on_job } }),
+  unassignCrew: (jobId, personId) =>
+    request(`/api/jobs/${jobId}/crew/${personId}`, { method: 'DELETE' }),
+  attachSop: (jobId, sop_id) => request(`/api/jobs/${jobId}/sops`, { method: 'POST', body: { sop_id } }),
+  tickSopStep: (jobId, jobSopId, step, done, photo_id) =>
+    request(`/api/jobs/${jobId}/sops/${jobSopId}`, { method: 'PATCH', body: { step, done, photo_id } }),
+  removeJobSop: (jobId, jobSopId) =>
+    request(`/api/jobs/${jobId}/sops/${jobSopId}`, { method: 'DELETE' }),
+  invoices: () => request('/api/invoices'),
+  createInvoice: (i) => request('/api/invoices', { method: 'POST', body: i }),
+  patchInvoice: (id, i) => request(`/api/invoices/${id}`, { method: 'PATCH', body: i }),
+  cash: () => request('/api/reports/cash'),
+
   /**
    * Owner-side photo bytes as an object URL.
    * An <img src> cannot carry an Authorization header, so the bytes are fetched

@@ -10,7 +10,8 @@ on site or photograph it, get an AI-drafted quote, margin-check it, and send the
 an interactive page they can accept from their phone. Log what the job actually cost and
 the system measures its own estimating drift, then briefs the next draft with it. Quote
 the same shape of job often enough and it offers to save it as a template. The rest of
-the system is specced but not yet built.
+the system is specced but not yet built. **Phase 0 of the roadmap** — job tracker, team
+directory, SOP library and invoicing — is built too.
 
 ## Architecture
 
@@ -45,6 +46,7 @@ cd worker && npm test                  # pricing, margin gate, and AI contract g
 
 - **[docs/](docs/README.md)** — index and map
 - **[BuilderOS system spec](docs/builderos-system-spec.md)** — the whole system: features, modules, 12-month roadmap, KPIs
+- **[Phase 0 — Foundation](docs/phase-0/README.md)** — jobs, team, SOPs, invoicing
 - **[Auto-quoting module](docs/auto-quoting/README.md)** — the built module ([wireframes & AI spec](docs/auto-quoting/ui-and-ai-spec.md), [output schema](docs/auto-quoting/schemas/draft-quote.schema.json), [build status](docs/auto-quoting/README.md#12-build-status))
 - **[Deployment](docs/deployment.md)** — Pages, Cloudflare, OpenRouter, and local dev
 
@@ -55,8 +57,11 @@ cd worker && npm test                  # pricing, margin gate, and AI contract g
 | `index.html` | Quotes list, start a new quote |
 | `builder.html` | Quote Builder — voice/typed brief, AI draft, margin gate, site photos, send |
 | `quote.html` | What the client gets: scope, photos, toggleable extras, Accept & Book |
-| `jobs.html` | Booked jobs; log what each one actually cost |
+| `jobs.html` | Every job, who's on it, checklists, and what it actually cost |
 | `variance.html` | Quote vs actual — per job, by job type, and per line |
+| `team.html` | Staff and subcontractor directory |
+| `sops.html` | SOP library — the checklists crews work through |
+| `cash.html` | Invoices, aging, and what to chase first |
 
 ## The rule the quoting module is built around
 

@@ -208,18 +208,117 @@ export async function similarPastJobs(db, jobType, limit = 5) {
 
 /* -------------------------------------------------------- jobs & variance */
 
+/**
+ * Every job with its crew, costs and checklist progress.
+ *
+ * The Phase 0 success criterion is "the owner can see every active job and who
+ * is on it in one place", so the crew is part of the list query rather than
+ * something each row has to fetch for itself.
+ */
 export async function listJobs(db) {
-  const { results } = await db
-    .prepare(
+  const [{ results: jobs }, { results: crew }, { results: sops }] = await Promise.all([
+    db.prepare(
       `SELECT j.*, COALESCE(SUM(c.amount), 0) AS actual_cost, COUNT(c.id) AS cost_entries
          FROM jobs j
     LEFT JOIN job_costs c ON c.job_id = j.id
         GROUP BY j.id
-        ORDER BY COALESCE(j.completed_at, j.created_at) DESC, j.rowid DESC
+        ORDER BY
+          CASE j.status WHEN 'in_progress' THEN 0 WHEN 'booked' THEN 1
+                        WHEN 'on_hold' THEN 2 ELSE 3 END,
+          COALESCE(j.target_start, j.created_at) DESC
         LIMIT 100`,
+    ).all(),
+    db.prepare(
+      `SELECT a.job_id, a.role_on_job, p.id AS person_id, p.name, p.kind
+         FROM job_assignments a JOIN people p ON p.id = a.person_id`,
+    ).all(),
+    db.prepare('SELECT job_id, steps FROM job_sops').all(),
+  ]);
+
+  const byJob = new Map();
+  for (const c of crew ?? []) {
+    if (!byJob.has(c.job_id)) byJob.set(c.job_id, []);
+    byJob.get(c.job_id).push({ person_id: c.person_id, name: c.name, kind: c.kind, role_on_job: c.role_on_job });
+  }
+
+  const sopByJob = new Map();
+  for (const s of sops ?? []) {
+    const steps = safeParse(s.steps, []);
+    const e = sopByJob.get(s.job_id) || { total: 0, done: 0 };
+    e.total += steps.length;
+    e.done += steps.filter((st) => st.done && (!st.needs_photo || st.photo_id)).length;
+    sopByJob.set(s.job_id, e);
+  }
+
+  return (jobs ?? []).map((j) => ({
+    ...j,
+    crew: byJob.get(j.id) ?? [],
+    sop_progress: sopByJob.get(j.id) ?? null,
+  }));
+}
+
+/* ------------------------------------------------------------- Phase 0 */
+
+export async function listPeople(db, { includeInactive = false } = {}) {
+  const { results } = await db
+    .prepare(
+      `SELECT p.*, COUNT(a.id) AS active_jobs
+         FROM people p
+    LEFT JOIN job_assignments a ON a.person_id = p.id
+    LEFT JOIN jobs j ON j.id = a.job_id AND j.status IN ('booked','in_progress')
+        ${includeInactive ? '' : 'WHERE p.active = 1'}
+        GROUP BY p.id
+        ORDER BY p.active DESC, p.name`,
+    )
+    .all();
+  return (results ?? []).map((p) => ({ ...p, active: !!p.active }));
+}
+
+export async function listSops(db) {
+  const { results } = await db.prepare('SELECT * FROM sops ORDER BY category, title').all();
+  return (results ?? []).map((s) => ({ ...s, steps: safeParse(s.steps, []) }));
+}
+
+export async function getSop(db, id) {
+  const row = await db.prepare('SELECT * FROM sops WHERE id = ?1').bind(id).first();
+  return row ? { ...row, steps: safeParse(row.steps, []) } : null;
+}
+
+export async function listJobSops(db, jobId) {
+  const { results } = await db
+    .prepare('SELECT * FROM job_sops WHERE job_id = ?1 ORDER BY attached_at, rowid')
+    .bind(jobId)
+    .all();
+  return (results ?? []).map((s) => ({ ...s, steps: safeParse(s.steps, []) }));
+}
+
+export async function getAssignments(db, jobId) {
+  const { results } = await db
+    .prepare(
+      `SELECT a.id, a.role_on_job, p.id AS person_id, p.name, p.kind, p.trade, p.phone
+         FROM job_assignments a JOIN people p ON p.id = a.person_id
+        WHERE a.job_id = ?1 ORDER BY p.name`,
+    )
+    .bind(jobId)
+    .all();
+  return results ?? [];
+}
+
+export async function listInvoices(db) {
+  const { results } = await db
+    .prepare(
+      `SELECT i.*, j.site_address
+         FROM invoices i LEFT JOIN jobs j ON j.id = i.job_id
+        ORDER BY COALESCE(i.issued_on, i.created_at) DESC, i.rowid DESC
+        LIMIT 200`,
     )
     .all();
   return results ?? [];
+}
+
+export async function invoiceNumbers(db) {
+  const { results } = await db.prepare('SELECT number FROM invoices').all();
+  return (results ?? []).map((r) => r.number);
 }
 
 export async function getJob(db, id) {

@@ -277,6 +277,36 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .photo.photo-multi { grid-template-columns: 1fr 1fr; }
 .photo.photo-multi img { aspect-ratio: 1 / 1; }
 
+/* Invoice aging strip */
+.aging { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 6px; }
+.aging-cell {
+  display: grid; gap: 2px; padding: 8px 6px; text-align: center;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
+}
+.aging-cell.is-late { background: var(--bad-bg); border-color: transparent; }
+.aging-cell.is-late .aging-amount { color: var(--bad); }
+.aging-label { font-size: 11px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .03em; }
+.aging-amount { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* SOP step lists */
+.sop-steps { grid-column: 1 / -1; margin: 6px 0 0; padding-left: 20px; font-size: 14px; color: var(--ink-2); }
+.sop-steps li { margin: 2px 0; }
+
+.sop-check {
+  display: grid; grid-template-columns: auto 1fr; gap: 10px;
+  align-items: start; padding: 10px 0; cursor: pointer;
+  border-top: 1px solid var(--line);
+}
+.sop-check:first-of-type { border-top: none; }
+.sop-check input[type="checkbox"] { width: 24px; height: 24px; margin: 0; accent-color: var(--brand); }
+.sop-check.awaiting { color: var(--warn); }
+
+.progress {
+  height: 8px; border-radius: 999px; background: var(--surface-2);
+  overflow: hidden; border: 1px solid var(--line);
+}
+.progress > span { display: block; height: 100%; background: var(--ok); }
+
 .inline-check {
   display: flex; align-items: center; gap: 10px;
   font-size: 14px; color: var(--ink); font-weight: 500; cursor: pointer;

@@ -3,8 +3,8 @@
 Product specs and implementation docs for BuilderOS, a business operating system
 for construction owners.
 
-The **auto-quoting module is built and runnable** — see
-[deployment](deployment.md). Everything else in the system spec is still design
+The **auto-quoting module and Phase 0 of the roadmap are built and runnable** —
+see [deployment](deployment.md). Phases 1–7 of the system spec are still design
 intent.
 
 ## Map
@@ -13,6 +13,7 @@ intent.
 docs/
 ├── builderos-system-spec.md          ← whole-system vision, features, 12-month roadmap
 ├── deployment.md                     ← GitHub Pages + Cloudflare + OpenRouter setup
+├── phase-0/README.md                 ← jobs, team, SOPs, invoicing (built)
 └── auto-quoting/
     ├── README.md                     ← module spec + what's built
     ├── ui-and-ai-spec.md             ← wireframes + AI prompt & output contract
@@ -20,7 +21,7 @@ docs/
         └── draft-quote.schema.json   ← the AI assistant's output contract
 
 web/       static PWA → GitHub Pages
-           index (quotes) · builder · quote (client) · jobs · variance
+           quotes · builder · client quote · jobs · variance · team · sops · cash
 worker/    Cloudflare Worker + D1 → the API, pricing, variance, and OpenRouter call
 ```
 
@@ -32,6 +33,7 @@ worker/    Cloudflare Worker + D1 → the API, pricing, variance, and OpenRouter
 | [Auto-quoting module](auto-quoting/README.md) | Quote templates, AI draft assistant, pricing & margin engine, interactive client quote, data model, phased build, the quote-vs-actual learning loop, build status | Module |
 | [Auto-quoting UI & AI spec](auto-quoting/ui-and-ai-spec.md) | Quote builder and client quote wireframes, AI prompt structure, output schema, worked voice-note example | Screen / contract |
 | [Draft quote schema](auto-quoting/schemas/draft-quote.schema.json) | JSON Schema (draft 2020-12) for the AI assistant's output | Contract |
+| [Phase 0 — Foundation](phase-0/README.md) | Job tracker, staff/sub directory, SOP library with photo proof, invoicing and payment tracking | Module |
 | [Deployment](deployment.md) | Deploying the Worker, the Pages site, and wiring them together; local development without an API key | Ops |
 
 ## Conventions

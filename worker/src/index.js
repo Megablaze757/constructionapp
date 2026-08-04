@@ -14,6 +14,12 @@ import {
   jobVariance, byJobType, lineCodeBias, biasBriefing, summarise,
 } from './variance.js';
 import { suggestTemplates } from './templates.js';
+import {
+  invoiceState, summariseInvoices, nextInvoiceNumber, sopProgress,
+} from './invoicing.js';
+
+/** Today as an ISO date. Injected into the money maths so it stays testable. */
+const today = () => new Date().toISOString().slice(0, 10);
 import * as db from './db.js';
 
 /** Cap on a single uploaded photo, after the browser has downscaled it. */
@@ -139,6 +145,14 @@ async function ownerRoutes(path, request, env, ctxo) {
     return varianceReport(env, ctxo);
   }
 
+  if (resource === 'reports' && id === 'cash' && method === 'GET') {
+    const invoices = await db.listInvoices(D1);
+    return json(summariseInvoices(invoices, today()), ctxo);
+  }
+
+  if (resource === 'people') return peopleRoutes(id, request, env, ctxo);
+  if (resource === 'sops') return sopRoutes(id, request, env, ctxo);
+  if (resource === 'invoices') return invoiceRoutes(id, request, env, ctxo);
   if (resource === 'jobs') return jobRoutes(id, action, subId, request, env, ctxo);
 
   if (resource !== 'quotes' || !id) return fail(404, 'Not found', {}, ctxo);
@@ -461,6 +475,179 @@ async function sendQuote(row, request, env, ctxo) {
   );
 }
 
+/* ------------------------------------------------- Phase 0: team & SOPs */
+
+async function peopleRoutes(id, request, env, ctxo) {
+  const D1 = env.DB;
+  const method = request.method;
+
+  if (!id && method === 'GET') {
+    const url = new URL(request.url);
+    return json({ people: await db.listPeople(D1, { includeInactive: url.searchParams.has('all') }) }, ctxo);
+  }
+
+  if (!id && method === 'POST') {
+    const body = await readJson(request);
+    const name = String(body.name || '').trim();
+    if (!name) return fail(400, 'A name is required.', {}, ctxo);
+    const personId = newId('per');
+    await D1.prepare(
+      `INSERT INTO people (id, name, kind, trade, role, phone, email, day_rate, notes)
+       VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)`,
+    ).bind(
+      personId, name,
+      body.kind === 'subcontractor' ? 'subcontractor' : 'staff',
+      body.trade || null, body.role || null, body.phone || null, body.email || null,
+      body.day_rate == null || body.day_rate === '' ? null : Number(body.day_rate),
+      body.notes || null,
+    ).run();
+    return json({ people: await db.listPeople(D1) }, { ...ctxo, status: 201 });
+  }
+
+  if (id && method === 'PATCH') {
+    const body = await readJson(request);
+    const fields = ['name', 'kind', 'trade', 'role', 'phone', 'email', 'day_rate', 'notes', 'active'];
+    const sets = [];
+    const binds = [id];
+    for (const f of fields) {
+      if (body[f] === undefined) continue;
+      binds.push(f === 'active' ? (body[f] ? 1 : 0) : body[f]);
+      sets.push(`${f} = ?${binds.length}`);
+    }
+    if (!sets.length) return fail(400, 'No updatable fields supplied', {}, ctxo);
+    await D1.prepare(`UPDATE people SET ${sets.join(', ')} WHERE id = ?1`).bind(...binds).run();
+    return json({ people: await db.listPeople(D1) }, ctxo);
+  }
+
+  if (id && method === 'DELETE') {
+    // Deactivated, not deleted: a person who worked a job stays attached to its
+    // history, so removing the row would tear a hole in past assignments.
+    await D1.prepare('UPDATE people SET active = 0 WHERE id = ?1').bind(id).run();
+    return json({ people: await db.listPeople(D1) }, ctxo);
+  }
+
+  return fail(404, 'Not found', {}, ctxo);
+}
+
+async function sopRoutes(id, request, env, ctxo) {
+  const D1 = env.DB;
+  if (!id && request.method === 'GET') return json({ sops: await db.listSops(D1) }, ctxo);
+
+  if (!id && request.method === 'POST') {
+    const body = await readJson(request);
+    const title = String(body.title || '').trim();
+    const steps = Array.isArray(body.steps) ? body.steps : [];
+    if (!title) return fail(400, 'A title is required.', {}, ctxo);
+    if (!steps.length) return fail(400, 'An SOP needs at least one step.', {}, ctxo);
+
+    const clean = steps
+      .map((s) => ({
+        text: String(typeof s === 'string' ? s : s.text || '').trim(),
+        needs_photo: typeof s === 'object' && !!s.needs_photo,
+      }))
+      .filter((s) => s.text);
+    if (!clean.length) return fail(400, 'Every step was empty.', {}, ctxo);
+
+    const sopId = newId('sop');
+    await D1.prepare(
+      'INSERT INTO sops (id, title, category, job_type, role, steps) VALUES (?1,?2,?3,?4,?5,?6)',
+    ).bind(sopId, title, body.category || 'general', body.job_type || null, body.role || null,
+      JSON.stringify(clean)).run();
+    return json({ sops: await db.listSops(D1) }, { ...ctxo, status: 201 });
+  }
+
+  return fail(404, 'Not found', {}, ctxo);
+}
+
+/* ------------------------------------------------------ Phase 0: invoices */
+
+async function invoiceRoutes(id, request, env, ctxo) {
+  const D1 = env.DB;
+  const method = request.method;
+
+  if (!id && method === 'GET') {
+    const rows = await db.listInvoices(D1);
+    return json({ invoices: rows.map((i) => invoiceState(i, today())) }, ctxo);
+  }
+
+  if (!id && method === 'POST') {
+    const body = await readJson(request);
+    const amount = Number(body.amount);
+    if (!Number.isFinite(amount) || amount < 0) return fail(400, 'A valid amount is required.', {}, ctxo);
+
+    let clientName = String(body.client_name || '').trim();
+    let jobId = body.job_id || null;
+    if (jobId) {
+      const job = await db.getJob(D1, jobId);
+      if (!job) return fail(400, 'That job does not exist.', {}, ctxo);
+      clientName = clientName || job.client_name;
+    }
+    if (!clientName) return fail(400, 'A client name is required.', {}, ctxo);
+
+    const number = String(body.number || '').trim() || nextInvoiceNumber(await db.invoiceNumbers(D1));
+    const issued = body.issued_on || today();
+    // 14-day terms unless told otherwise, matching the seeded template terms.
+    const due = body.due_on
+      || new Date(Date.parse(`${issued}T00:00:00Z`) + 14 * 864e5).toISOString().slice(0, 10);
+
+    const invId = newId('inv');
+    await D1.prepare(
+      `INSERT INTO invoices (id, job_id, number, client_name, amount, status, issued_on, due_on, notes)
+       VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)`,
+    ).bind(invId, jobId, number, clientName, money(amount),
+      body.status === 'sent' ? 'sent' : 'draft', issued, due, body.notes || null).run();
+
+    const rows = await db.listInvoices(D1);
+    return json({ invoices: rows.map((i) => invoiceState(i, today())) }, { ...ctxo, status: 201 });
+  }
+
+  if (id && method === 'PATCH') {
+    const body = await readJson(request);
+    const existing = await D1.prepare('SELECT * FROM invoices WHERE id = ?1').bind(id).first();
+    if (!existing) return fail(404, 'Invoice not found', {}, ctxo);
+
+    const sets = [];
+    const binds = [id];
+    const push = (col, val) => { binds.push(val); sets.push(`${col} = ?${binds.length}`); };
+
+    if (body.status) {
+      if (!['draft', 'sent', 'paid', 'void'].includes(body.status)) {
+        return fail(400, 'Unknown invoice status.', {}, ctxo);
+      }
+      push('status', body.status);
+      if (body.status === 'sent' && !existing.issued_on) push('issued_on', today());
+      // Marking it paid settles the balance and stamps the date, so the two can
+      // never disagree with each other.
+      if (body.status === 'paid') {
+        push('amount_paid', money(existing.amount));
+        push('paid_on', body.paid_on || today());
+      }
+    }
+
+    if (body.amount_paid !== undefined) {
+      const paid = Number(body.amount_paid);
+      if (!Number.isFinite(paid) || paid < 0) return fail(400, 'Payment must be zero or more.', {}, ctxo);
+      push('amount_paid', money(paid));
+      if (paid >= existing.amount) {
+        push('status', 'paid');
+        push('paid_on', body.paid_on || today());
+      }
+    }
+
+    for (const f of ['amount', 'due_on', 'issued_on', 'notes', 'client_name']) {
+      if (body[f] !== undefined) push(f, f === 'amount' ? money(Number(body[f])) : body[f]);
+    }
+
+    if (!sets.length) return fail(400, 'No updatable fields supplied', {}, ctxo);
+    await D1.prepare(`UPDATE invoices SET ${sets.join(', ')} WHERE id = ?1`).bind(...binds).run();
+
+    const rows = await db.listInvoices(D1);
+    return json({ invoices: rows.map((i) => invoiceState(i, today())) }, ctxo);
+  }
+
+  return fail(404, 'Not found', {}, ctxo);
+}
+
 /* --------------------------------------------------- jobs & cost capture */
 
 async function jobRoutes(id, action, subId, request, env, ctxo) {
@@ -468,30 +655,152 @@ async function jobRoutes(id, action, subId, request, env, ctxo) {
   const method = request.method;
 
   if (!id && method === 'GET') return json({ jobs: await db.listJobs(D1) }, ctxo);
+
+  // A job created by hand, for work that did not come through a quote here.
+  if (!id && method === 'POST') {
+    const body = await readJson(request);
+    const client = String(body.client_name || '').trim();
+    const jobType = String(body.job_type || '').trim();
+    if (!client) return fail(400, 'A client name is required.', {}, ctxo);
+    if (!jobType) return fail(400, 'A job type is required.', {}, ctxo);
+
+    const jobId = newId('job');
+    await D1.prepare(
+      `INSERT INTO jobs (id, quote_id, client_name, site_address, job_type, status,
+                         budget_baseline, cost_baseline, target_start, target_end, notes)
+       VALUES (?1, NULL, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)`,
+    ).bind(
+      jobId, client, body.site_address || null, jobType,
+      ['booked', 'in_progress', 'on_hold'].includes(body.status) ? body.status : 'booked',
+      money(Number(body.budget_baseline) || 0),
+      money(Number(body.cost_baseline) || 0),
+      body.target_start || null, body.target_end || null, body.notes || null,
+    ).run();
+
+    return json({ job: await db.getJob(D1, jobId) }, { ...ctxo, status: 201 });
+  }
+
   if (!id) return fail(404, 'Not found', {}, ctxo);
 
   const job = await db.getJob(D1, id);
   if (!job) return fail(404, 'Job not found', {}, ctxo);
 
   if (!action && method === 'GET') {
-    const costs = await db.getJobCosts(D1, id);
-    return json({ job, costs, variance: jobVariance(job, costs) }, ctxo);
+    const [costs, crew, sops] = await Promise.all([
+      db.getJobCosts(D1, id),
+      db.getAssignments(D1, id),
+      db.listJobSops(D1, id),
+    ]);
+    return json({
+      job,
+      costs,
+      variance: jobVariance(job, costs),
+      crew,
+      sops: sops.map((s) => ({ ...s, progress: sopProgress(s.steps) })),
+    }, ctxo);
+  }
+
+  /* ------------------------------------------------------------ crew */
+
+  if (action === 'crew' && method === 'POST') {
+    const body = await readJson(request);
+    if (!body.person_id) return fail(400, 'person_id is required', {}, ctxo);
+    try {
+      await D1.prepare(
+        'INSERT INTO job_assignments (id, job_id, person_id, role_on_job) VALUES (?1,?2,?3,?4)',
+      ).bind(newId('asg'), id, body.person_id, body.role_on_job || null).run();
+    } catch (err) {
+      // The UNIQUE(job_id, person_id) index makes assigning twice a no-op rather
+      // than an error the owner has to think about.
+      if (!/UNIQUE/i.test(String(err))) throw err;
+    }
+    return json({ crew: await db.getAssignments(D1, id) }, ctxo);
+  }
+
+  if (action === 'crew' && method === 'DELETE' && subId) {
+    await D1.prepare('DELETE FROM job_assignments WHERE job_id = ?1 AND person_id = ?2')
+      .bind(id, subId).run();
+    return json({ crew: await db.getAssignments(D1, id) }, ctxo);
+  }
+
+  /* ------------------------------------------------------------ SOPs */
+
+  if (action === 'sops' && method === 'POST') {
+    const body = await readJson(request);
+    const sop = await db.getSop(D1, body.sop_id);
+    if (!sop) return fail(400, 'That SOP does not exist.', {}, ctxo);
+
+    // Steps are copied, not referenced: editing the library later must not
+    // rewrite a checklist somebody has already signed off.
+    const steps = sop.steps.map((s) => ({
+      text: s.text, needs_photo: !!s.needs_photo, done: false, done_at: null, photo_id: null,
+    }));
+    await D1.prepare(
+      'INSERT INTO job_sops (id, job_id, sop_id, title, sop_version, steps) VALUES (?1,?2,?3,?4,?5,?6)',
+    ).bind(newId('jsop'), id, sop.id, sop.title, sop.version, JSON.stringify(steps)).run();
+
+    const sops = await db.listJobSops(D1, id);
+    return json({ sops: sops.map((s) => ({ ...s, progress: sopProgress(s.steps) })) }, { ...ctxo, status: 201 });
+  }
+
+  if (action === 'sops' && method === 'PATCH' && subId) {
+    const body = await readJson(request);
+    const idx = Number(body.step);
+    const row = await D1.prepare('SELECT * FROM job_sops WHERE id = ?1 AND job_id = ?2')
+      .bind(subId, id).first();
+    if (!row) return fail(404, 'Checklist not found', {}, ctxo);
+
+    const steps = JSON.parse(row.steps);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= steps.length) {
+      return fail(400, 'step must be a valid step index', {}, ctxo);
+    }
+    steps[idx] = {
+      ...steps[idx],
+      done: !!body.done,
+      done_at: body.done ? new Date().toISOString() : null,
+      done_by: body.done ? (body.done_by || null) : null,
+      photo_id: body.photo_id ?? steps[idx].photo_id ?? null,
+    };
+    await D1.prepare('UPDATE job_sops SET steps = ?2 WHERE id = ?1')
+      .bind(subId, JSON.stringify(steps)).run();
+
+    const sops = await db.listJobSops(D1, id);
+    return json({ sops: sops.map((s) => ({ ...s, progress: sopProgress(s.steps) })) }, ctxo);
+  }
+
+  if (action === 'sops' && method === 'DELETE' && subId) {
+    await D1.prepare('DELETE FROM job_sops WHERE id = ?1 AND job_id = ?2').bind(subId, id).run();
+    const sops = await db.listJobSops(D1, id);
+    return json({ sops: sops.map((s) => ({ ...s, progress: sopProgress(s.steps) })) }, ctxo);
   }
 
   if (!action && method === 'PATCH') {
     const body = await readJson(request);
-    const status = body.status;
-    if (!['booked', 'in_progress', 'complete'].includes(status)) {
-      return fail(400, 'status must be booked, in_progress or complete', {}, ctxo);
+
+    if (body.status !== undefined) {
+      if (!['booked', 'in_progress', 'complete', 'on_hold'].includes(body.status)) {
+        return fail(400, 'status must be booked, in_progress, on_hold or complete', {}, ctxo);
+      }
+      // Stamp the completion date on the transition, and clear it if the job is
+      // reopened — otherwise a reopened job keeps a date that says it finished.
+      await D1.prepare(
+        `UPDATE jobs
+            SET status = ?2,
+                completed_at = CASE WHEN ?2 = 'complete' THEN COALESCE(completed_at, date('now')) ELSE NULL END
+          WHERE id = ?1`,
+      ).bind(id, body.status).run();
     }
-    // Stamp the completion date on the transition, and clear it if the job is
-    // reopened — otherwise a reopened job keeps a date that says it finished.
-    await D1.prepare(
-      `UPDATE jobs
-          SET status = ?2,
-              completed_at = CASE WHEN ?2 = 'complete' THEN COALESCE(completed_at, date('now')) ELSE NULL END
-        WHERE id = ?1`,
-    ).bind(id, status).run();
+
+    const sets = [];
+    const binds = [id];
+    for (const f of ['client_name', 'site_address', 'target_start', 'target_end', 'notes']) {
+      if (body[f] === undefined) continue;
+      binds.push(body[f]);
+      sets.push(`${f} = ?${binds.length}`);
+    }
+    if (sets.length) {
+      await D1.prepare(`UPDATE jobs SET ${sets.join(', ')} WHERE id = ?1`).bind(...binds).run();
+    }
 
     const updated = await db.getJob(D1, id);
     const costs = await db.getJobCosts(D1, id);

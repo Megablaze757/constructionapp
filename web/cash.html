@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1a56db">
+<title>Cash — BuilderOS</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/app.css">
+<script src="config.js"></script>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <a class="back" href="index.html" aria-label="Back to quotes">←</a>
+    <h1>Cash</h1>
+    <button class="btn btn-sm btn-primary" id="add-btn" type="button">+ Invoice</button>
+  </div>
+
+  <div id="banner"></div>
+
+  <div class="card">
+    <h2>Outstanding</h2>
+    <div class="card-body" id="summary"><span class="muted">Loading…</span></div>
+  </div>
+
+  <div class="card" id="chase-card" hidden>
+    <h2>Chase these first</h2>
+    <div class="lines" id="chase"></div>
+  </div>
+
+  <div class="card">
+    <h2>All invoices</h2>
+    <div class="lines" id="invoices"></div>
+  </div>
+</div>
+
+<dialog id="invoice-dialog">
+  <form method="dialog" class="card-body">
+    <h2>New invoice</h2>
+    <label>Job (optional)
+      <select id="i-job"><option value="">Not linked to a job</option></select>
+    </label>
+    <label>Client
+      <input type="text" id="i-client" autocomplete="off">
+    </label>
+    <label>Amount (£)
+      <input type="number" id="i-amount" min="0" step="0.01" inputmode="decimal">
+    </label>
+    <label>Due date
+      <input type="text" id="i-due" placeholder="YYYY-MM-DD (blank = 14 days)" autocomplete="off">
+    </label>
+    <label class="inline-check">
+      <input type="checkbox" id="i-sent" checked>
+      <span>Mark as sent (starts the clock)</span>
+    </label>
+    <div class="btn-row">
+      <button class="btn" value="cancel" type="submit">Cancel</button>
+      <button class="btn btn-primary" value="save" type="submit">Create</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="payment-dialog">
+  <form method="dialog" class="card-body">
+    <h2>Record a payment</h2>
+    <p class="muted" id="pay-detail" style="margin:0"></p>
+    <label>Amount received so far (£)
+      <input type="number" id="pay-amount" min="0" step="0.01" inputmode="decimal">
+    </label>
+    <div class="btn-row">
+      <button class="btn" value="cancel" type="submit">Cancel</button>
+      <button class="btn btn-primary" value="save" type="submit">Record</button>
+    </div>
+    <button class="btn btn-accept" id="pay-full" value="full" type="submit">Paid in full</button>
+  </form>
+</dialog>
+
+<script type="module" src="assets/js/cash.js"></script>
+</body>
+</html>
