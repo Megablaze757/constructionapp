@@ -3,8 +3,8 @@
 Product specs and implementation docs for BuilderOS, a business operating system
 for construction owners.
 
-The **auto-quoting module and roadmap Phases 0–1 are built and runnable** — see
-[deployment](deployment.md). Phases 2–7 of the system spec are still design intent.
+The **auto-quoting module and roadmap Phases 0–2 are built and runnable** — see
+[deployment](deployment.md). Phases 3–7 of the system spec are still design intent.
 
 ## Map
 
@@ -14,6 +14,7 @@ docs/
 ├── deployment.md                     ← GitHub Pages + Cloudflare + OpenRouter setup
 ├── phase-0/README.md                 ← jobs, team, SOPs, invoicing (built)
 ├── phase-1/README.md                 ← tasks, crew links, site log, check-ins (built)
+├── phase-2/README.md                 ← owner dashboard, reliability, forecast (built)
 └── auto-quoting/
     ├── README.md                     ← module spec + what's built
     ├── ui-and-ai-spec.md             ← wireframes + AI prompt & output contract
@@ -21,7 +22,7 @@ docs/
         └── draft-quote.schema.json   ← the AI assistant's output contract
 
 web/       static PWA → GitHub Pages
-           quotes · builder · client quote · jobs · variance
+           dashboard · quotes · builder · client quote · jobs · variance
            team · sops · cash · crew (field-facing)
 worker/    Cloudflare Worker + D1 → the API, pricing, variance, and OpenRouter call
 ```
@@ -36,6 +37,7 @@ worker/    Cloudflare Worker + D1 → the API, pricing, variance, and OpenRouter
 | [Draft quote schema](auto-quoting/schemas/draft-quote.schema.json) | JSON Schema (draft 2020-12) for the AI assistant's output | Contract |
 | [Phase 0 — Foundation](phase-0/README.md) | Job tracker, staff/sub directory, SOP library with photo proof, invoicing and payment tracking | Module |
 | [Phase 1 — Delegation](phase-1/README.md) | Task assignment with photo proof and escalation, crew access links, role-based SOPs, daily site log, client check-ins | Module |
+| [Phase 2 — Visibility](phase-2/README.md) | Owner dashboard, at-risk jobs, cash forecast, live margin, reliability scoring and what it refuses to guess | Module |
 | [Deployment](deployment.md) | Deploying the Worker, the Pages site, and wiring them together; local development without an API key | Ops |
 
 ## Conventions

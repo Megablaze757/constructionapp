@@ -118,6 +118,7 @@ export const api = {
 
   // Phase 1 — delegation
   attention: () => request('/api/reports/attention'),
+  dashboard: () => request('/api/reports/dashboard'),
   crewLink: (personId) => request(`/api/people/${personId}/link`, { method: 'POST' }),
   addTask: (jobId, t) => request(`/api/jobs/${jobId}/tasks`, { method: 'POST', body: t }),
   patchTask: (jobId, taskId, t) =>

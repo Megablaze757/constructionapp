@@ -10,9 +10,10 @@ on site or photograph it, get an AI-drafted quote, margin-check it, and send the
 an interactive page they can accept from their phone. Log what the job actually cost and
 the system measures its own estimating drift, then briefs the next draft with it. Quote
 the same shape of job often enough and it offers to save it as a template. The rest of
-the system is specced but not yet built. **Roadmap Phases 0–1** are built too — job tracker, team
-directory, SOP library, invoicing, and a delegation layer where the crew log their
-own work through a personal link.
+the system is specced but not yet built. **Roadmap Phases 0–2** are built too — job tracker, team
+directory, SOP library, invoicing, a delegation layer where the crew log their own
+work through a personal link, and an owner dashboard that answers "how is the
+business" in one screen.
 
 ## Architecture
 
@@ -49,6 +50,7 @@ cd worker && npm test                  # pricing, margin gate, and AI contract g
 - **[BuilderOS system spec](docs/builderos-system-spec.md)** — the whole system: features, modules, 12-month roadmap, KPIs
 - **[Phase 0 — Foundation](docs/phase-0/README.md)** — jobs, team, SOPs, invoicing
 - **[Phase 1 — Delegation](docs/phase-1/README.md)** — tasks, crew links, site log, check-ins
+- **[Phase 2 — Visibility](docs/phase-2/README.md)** — owner dashboard, reliability, cash forecast
 - **[Auto-quoting module](docs/auto-quoting/README.md)** — the built module ([wireframes & AI spec](docs/auto-quoting/ui-and-ai-spec.md), [output schema](docs/auto-quoting/schemas/draft-quote.schema.json), [build status](docs/auto-quoting/README.md#12-build-status))
 - **[Deployment](docs/deployment.md)** — Pages, Cloudflare, OpenRouter, and local dev
 
@@ -56,6 +58,7 @@ cd worker && npm test                  # pricing, margin gate, and AI contract g
 
 | Screen | What it does |
 | --- | --- |
+| `dashboard.html` | The single pane of glass: cash, jobs, risks, decisions, reliability |
 | `index.html` | Quotes list, start a new quote |
 | `builder.html` | Quote Builder — voice/typed brief, AI draft, margin gate, site photos, send |
 | `quote.html` | What the client gets: scope, photos, toggleable extras, Accept & Book |

@@ -281,6 +281,20 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .sop-detail summary { cursor: pointer; font-weight: 600; min-height: 32px; display: flex; align-items: center; }
 .sop-detail[open] summary { color: var(--brand); }
 
+/* Dashboard headline tiles */
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tile {
+  display: grid; gap: 2px; padding: 12px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
+}
+.tile.is-bad { background: var(--bad-bg); border-color: transparent; }
+.tile.is-bad .tile-value { color: var(--bad); }
+.tile.is-ok { background: var(--ok-bg); border-color: transparent; }
+.tile.is-ok .tile-value { color: var(--ok); }
+.tile-label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-2); font-weight: 700; }
+.tile-value { font-size: 24px; font-weight: 750; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.tile-sub { font-size: 12px; color: var(--ink-2); }
+
 /* Invoice aging strip */
 .aging { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 6px; }
 .aging-cell {

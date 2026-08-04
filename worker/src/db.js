@@ -379,6 +379,58 @@ export async function allCheckins(db) {
   return results ?? [];
 }
 
+/**
+ * Everything the dashboard needs, in one pass.
+ *
+ * Fetched as whole tables and grouped in memory rather than per-job queries: a
+ * dashboard that fires N queries per job gets slower exactly as the business
+ * grows, which is when the owner most needs it.
+ */
+export async function dashboardData(db) {
+  const [jobs, crew, costs, tasks, logs, sops, invoices, people] = await Promise.all([
+    db.prepare('SELECT * FROM jobs').all(),
+    db.prepare(
+      `SELECT a.job_id, a.person_id, p.name, p.kind FROM job_assignments a
+         JOIN people p ON p.id = a.person_id`,
+    ).all(),
+    db.prepare('SELECT job_id, amount FROM job_costs').all(),
+    db.prepare('SELECT * FROM tasks WHERE status != \'cancelled\'').all(),
+    db.prepare('SELECT id, job_id, kind, acknowledged_at, created_at, body FROM site_logs').all(),
+    db.prepare('SELECT job_id, steps FROM job_sops').all(),
+    db.prepare('SELECT * FROM invoices').all(),
+    db.prepare('SELECT * FROM people WHERE active = 1').all(),
+  ]);
+
+  const group = (rows, key) => {
+    const m = new Map();
+    for (const r of rows ?? []) {
+      if (!m.has(r[key])) m.set(r[key], []);
+      m.get(r[key]).push(r);
+    }
+    return m;
+  };
+
+  const stepsByJob = new Map();
+  for (const s of sops.results ?? []) {
+    const steps = safeParse(s.steps, []);
+    stepsByJob.set(s.job_id, [...(stepsByJob.get(s.job_id) ?? []), ...steps]);
+  }
+
+  return {
+    jobs: jobs.results ?? [],
+    people: (people.results ?? []).map((p) => ({ ...p, active: !!p.active })),
+    invoices: invoices.results ?? [],
+    crewByJob: group(crew.results, 'job_id'),
+    costsByJob: group(costs.results, 'job_id'),
+    rawTasksByJob: group((tasks.results ?? []).map((t) => ({ ...t, needs_photo: !!t.needs_photo })), 'job_id'),
+    tasksByPerson: group((tasks.results ?? []).map((t) => ({ ...t, needs_photo: !!t.needs_photo })), 'person_id'),
+    logsByJob: group(logs.results, 'job_id'),
+    stepsByJob,
+    allTasks: (tasks.results ?? []).map((t) => ({ ...t, needs_photo: !!t.needs_photo })),
+    allLogs: logs.results ?? [],
+  };
+}
+
 export async function personByToken(db, token) {
   const row = await db
     .prepare('SELECT * FROM people WHERE access_token = ?1 AND active = 1')

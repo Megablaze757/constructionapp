@@ -6,7 +6,7 @@
  * no price at all — so /api/ and /q/ always go to the network.
  */
 
-const CACHE = 'builderos-shell-v4';
+const CACHE = 'builderos-shell-v5';
 const SHELL = [
   './',
   './index.html',
@@ -18,6 +18,7 @@ const SHELL = [
   './sops.html',
   './cash.html',
   './crew.html',
+  './dashboard.html',
   './config.js',
   './manifest.webmanifest',
   './assets/app.css',
@@ -34,6 +35,7 @@ const SHELL = [
   './assets/js/sops.js',
   './assets/js/cash.js',
   './assets/js/crew.js',
+  './assets/js/dashboard.js',
 ];
 
 self.addEventListener('install', (event) => {

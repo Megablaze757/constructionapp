@@ -21,6 +21,11 @@ import {
   taskState, ownerAttention, taskProgress, plannedCheckins, overdueCheckins, visibleSops,
 } from './delegation.js';
 
+import { atRiskJobs, jobProgress, cashForecast, marginHealth } from './dashboard.js';
+import {
+  reliabilityBoard, reliabilityConcerns, MEASURED, NOT_MEASURED,
+} from './reliability.js';
+
 /** Cap on a job photo, after the browser has downscaled it. */
 const MAX_JOB_PHOTO_BYTES = 1_000_000;
 
@@ -155,6 +160,11 @@ async function ownerRoutes(path, request, env, ctxo) {
   if (resource === 'reports' && id === 'cash' && method === 'GET') {
     const invoices = await db.listInvoices(D1);
     return json(summariseInvoices(invoices, today()), ctxo);
+  }
+
+  // The single pane of glass (system spec §3).
+  if (resource === 'reports' && id === 'dashboard' && method === 'GET') {
+    return dashboardReport(env, ctxo);
   }
 
   // What the owner actually needs to look at, across every running job.
@@ -489,6 +499,84 @@ async function sendQuote(row, request, env, ctxo) {
     },
     ctxo,
   );
+}
+
+/* ---------------------------------------------- Phase 2: owner dashboard */
+
+async function dashboardReport(env, ctxo) {
+  const d = await db.dashboardData(env.DB);
+  const now = today();
+
+  // Task state is computed once and reused, so the dashboard's idea of "late"
+  // cannot drift from the job screen's.
+  const tasksByJob = new Map();
+  for (const [jobId, rows] of d.rawTasksByJob) {
+    tasksByJob.set(jobId, rows.map((t) => taskState(t, now)));
+  }
+
+  const active = d.jobs.filter((j) => j.status !== 'complete');
+  const risks = atRiskJobs(d.jobs, {
+    crewByJob: d.crewByJob,
+    costsByJob: d.costsByJob,
+    tasksByJob,
+    logsByJob: d.logsByJob,
+  }, now);
+  const riskIds = new Set(risks.map((r) => r.job_id));
+
+  const cash = summariseInvoices(d.invoices, now);
+  const invoicedJobIds = new Set(d.invoices.filter((i) => i.job_id).map((i) => i.job_id));
+  const forecast = cashForecast(d.invoices, d.jobs, invoicedJobIds, now);
+
+  const board = reliabilityBoard(d.people, d.tasksByPerson, now);
+  const attention = ownerAttention(d.allTasks, d.allLogs, now);
+
+  return json({
+    headline: {
+      outstanding: cash.outstanding,
+      overdue_amount: cash.overdue_amount,
+      overdue_count: cash.overdue_count,
+      cash_next_30: forecast.next_30,
+      active_jobs: active.length,
+      at_risk_jobs: risks.length,
+      on_track_jobs: active.length - risks.length,
+    },
+    jobs: active
+      .map((j) => ({
+        id: j.id,
+        client_name: j.client_name,
+        site_address: j.site_address,
+        job_type: j.job_type,
+        status: j.status,
+        target_end: j.target_end,
+        percent: jobProgress(j, tasksByJob.get(j.id) ?? [], d.stepsByJob.get(j.id) ?? []),
+        at_risk: riskIds.has(j.id),
+        crew: (d.crewByJob.get(j.id) ?? []).map((c) => c.name),
+      }))
+      .sort((a, b) => Number(b.at_risk) - Number(a.at_risk) || a.percent - b.percent),
+    at_risk: risks,
+    cash: {
+      outstanding: cash.outstanding,
+      overdue_amount: cash.overdue_amount,
+      aging: cash.aging,
+      needs_chasing: cash.needs_chasing.slice(0, 5),
+      forecast,
+    },
+    margin: marginHealth(d.jobs, d.costsByJob),
+    // "Needs your decision" — the same attention feed as Phase 1, so there is
+    // one definition of what is the owner's problem.
+    decisions: {
+      escalated: attention.escalated.slice(0, 8),
+      unassigned: attention.unassigned.slice(0, 8),
+      awaiting_photo: attention.awaiting_photo.slice(0, 8),
+      unread_issues: attention.unread_issues.slice(0, 8),
+    },
+    reliability: {
+      board,
+      concerns: reliabilityConcerns(board),
+      measured: MEASURED,
+      not_measured: NOT_MEASURED,
+    },
+  }, ctxo);
 }
 
 /* ------------------------------------------------- Phase 0: team & SOPs */
