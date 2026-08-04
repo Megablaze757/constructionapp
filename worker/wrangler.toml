@@ -12,11 +12,25 @@ ALLOWED_ORIGINS = "http://localhost:8788,http://127.0.0.1:8788"
 PUBLIC_APP_URL = "http://localhost:8788"
 # Any model on OpenRouter that supports structured outputs.
 OPENROUTER_MODEL = "anthropic/claude-sonnet-5"
+# Name used in automated messages to clients.
+BUSINESS_NAME = "Builder Co."
+# "simulated" (default) records what would be sent without sending it.
+# "webhook" POSTs each message to MESSAGING_WEBHOOK_URL so you can wire any
+# provider (Twilio, WhatsApp Business, Zapier, Make) without changing code.
+MESSAGING_DRIVER = "simulated"
+# MESSAGING_WEBHOOK_URL = "https://your-endpoint.example/messages"
+# MESSAGING_WEBHOOK_SECRET is a secret — set it with `wrangler secret put`.
 
 [[d1_databases]]
 binding = "DB"
 database_name = "builderos-quoting"
 database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+# Runs the automation engine hourly. The engine is a pure function of state and
+# deduplicates every firing, so running it often is safe — a "14 days overdue"
+# rule chases once, not once an hour.
+[triggers]
+crons = ["0 * * * *"]
 
 [observability]
 enabled = true

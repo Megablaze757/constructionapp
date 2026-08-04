@@ -142,7 +142,7 @@ Four terminals, or run the first three in the background:
 ```bash
 # 1. the API
 cd worker && npm install
-npm run db:local                    # applies all three migrations
+npm run db:local                    # applies every migration
 npx wrangler dev                    # http://127.0.0.1:8787
 
 # 2. a stand-in for OpenRouter, so you can develop without spending tokens
@@ -188,6 +188,25 @@ structured-output support will mostly work and then intermittently return prose,
 which the Worker rejects as a failed draft.
 
 ---
+
+## Connecting a message provider
+
+Automations run with **no provider by default**: messages are recorded in the
+outbox as `simulated` and nothing is sent. To send for real, set in
+`wrangler.toml`:
+
+```toml
+MESSAGING_DRIVER = "webhook"
+MESSAGING_WEBHOOK_URL = "https://your-endpoint.example/messages"
+```
+
+and optionally `wrangler secret put MESSAGING_WEBHOOK_SECRET` (sent as a bearer
+token). Each message POSTs as `{channel, to, to_name, subject, body,
+entity_type, entity_id}` — point it at Twilio, WhatsApp Business, Zapier, Make or
+your own Worker. See [Phase 3](phase-3/README.md#1-the-rule-that-shapes-everything-nothing-is-claimed-as-sent).
+
+The hourly cron in `wrangler.toml` runs the engine. It deduplicates every
+firing, so running it often is safe.
 
 ## Security notes
 

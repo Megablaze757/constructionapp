@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1a56db">
+<title>Automations — BuilderOS</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/app.css">
+<script src="config.js"></script>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <a class="back" href="dashboard.html" aria-label="Back to dashboard">←</a>
+    <h1>Automations</h1>
+    <button class="btn btn-sm btn-primary" id="new-btn" type="button">+ Rule</button>
+  </div>
+
+  <div id="banner"></div>
+
+  <div class="card">
+    <div class="card-body" id="driver-status"><span class="muted">Loading…</span></div>
+  </div>
+
+  <div class="card">
+    <h2>Rules</h2>
+    <div class="lines" id="rules"></div>
+  </div>
+
+  <div class="card">
+    <h2>Outbox <span class="muted" style="text-transform:none;letter-spacing:0">what went out</span></h2>
+    <div class="lines" id="outbox"></div>
+  </div>
+</div>
+
+<div class="actionbar">
+  <div class="inner">
+    <button class="btn" id="dry-btn" type="button">Preview what would happen</button>
+    <button class="btn btn-primary" id="run-btn" type="button">Run now</button>
+  </div>
+</div>
+
+<dialog id="run-dialog">
+  <form method="dialog" class="card-body">
+    <h2 id="run-title">Preview</h2>
+    <div id="run-results"></div>
+    <button class="btn" value="close" type="submit">Close</button>
+  </form>
+</dialog>
+
+<dialog id="rule-dialog">
+  <form method="dialog" class="card-body">
+    <h2>New rule</h2>
+    <label>Name
+      <input type="text" id="r-name" placeholder="e.g. Chase 21-day invoices" autocomplete="off">
+    </label>
+    <label>WHEN
+      <select id="r-trigger"></select>
+    </label>
+    <div id="r-params"></div>
+    <label>THEN
+      <select id="r-action"></select>
+    </label>
+    <label id="r-channel-row" hidden>Send by
+      <select id="r-channel">
+        <option value="sms">SMS</option>
+        <option value="whatsapp">WhatsApp</option>
+        <option value="email">Email</option>
+      </select>
+    </label>
+    <label id="r-message-row">Message
+      <textarea id="r-message" rows="3" placeholder="Use {placeholders} from the trigger"></textarea>
+    </label>
+    <label id="r-title-row" hidden>Task title
+      <input type="text" id="r-title" autocomplete="off">
+    </label>
+    <p class="muted" id="r-placeholders" style="margin:0"></p>
+    <div class="btn-row">
+      <button class="btn" value="cancel" type="submit">Cancel</button>
+      <button class="btn btn-primary" value="save" type="submit">Create rule</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module" src="assets/js/automations.js"></script>
+</body>
+</html>

@@ -119,6 +119,14 @@ export const api = {
   // Phase 1 — delegation
   attention: () => request('/api/reports/attention'),
   dashboard: () => request('/api/reports/dashboard'),
+
+  // Phase 3 — automation
+  automations: () => request('/api/automations'),
+  createAutomation: (a) => request('/api/automations', { method: 'POST', body: a }),
+  patchAutomation: (id, a) => request(`/api/automations/${id}`, { method: 'PATCH', body: a }),
+  deleteAutomation: (id) => request(`/api/automations/${id}`, { method: 'DELETE' }),
+  runAutomations: (dry = false) => request(`/api/automations/run${dry ? '?dry=1' : ''}`, { method: 'POST' }),
+  outbox: () => request('/api/outbox'),
   crewLink: (personId) => request(`/api/people/${personId}/link`, { method: 'POST' }),
   addTask: (jobId, t) => request(`/api/jobs/${jobId}/tasks`, { method: 'POST', body: t }),
   patchTask: (jobId, taskId, t) =>

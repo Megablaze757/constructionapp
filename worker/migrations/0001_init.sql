@@ -6,6 +6,9 @@
 -- in later migrations; dropping them here keeps a full re-run a clean reset
 -- rather than leaving orphaned rows behind to skew reports — or colliding with
 -- seeded ids the second time round.
+DROP TABLE IF EXISTS automation_runs;  -- 0006
+DROP TABLE IF EXISTS outbox;           -- 0006
+DROP TABLE IF EXISTS automations;      -- 0006
 DROP TABLE IF EXISTS tasks;            -- 0005
 DROP TABLE IF EXISTS site_logs;        -- 0005
 DROP TABLE IF EXISTS job_photos;       -- 0005

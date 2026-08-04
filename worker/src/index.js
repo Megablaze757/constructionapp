@@ -18,13 +18,18 @@ import {
   invoiceState, summariseInvoices, nextInvoiceNumber, sopProgress,
 } from './invoicing.js';
 import {
-  taskState, ownerAttention, taskProgress, plannedCheckins, overdueCheckins, visibleSops,
+  taskState, ownerAttention, taskProgress, plannedCheckins, overdueCheckins,
+  visibleSops, addDays,
 } from './delegation.js';
 
 import { atRiskJobs, jobProgress, cashForecast, marginHealth } from './dashboard.js';
 import {
   reliabilityBoard, reliabilityConcerns, MEASURED, NOT_MEASURED,
 } from './reliability.js';
+import {
+  TRIGGERS, ACTIONS, planActions, validateAutomation,
+} from './automation.js';
+import { deliver, driverName, resolveRecipient, DRIVERS } from './messaging.js';
 
 /** Cap on a job photo, after the browser has downscaled it. */
 const MAX_JOB_PHOTO_BYTES = 1_000_000;
@@ -37,6 +42,19 @@ import * as db from './db.js';
 const MAX_PHOTO_BYTES = 1_000_000;
 
 export default {
+  /**
+   * Cloudflare cron trigger. This is what makes the engine automation rather
+   * than a button: the same runAutomations() the API calls, on a schedule.
+   */
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(
+      runAutomations(env).then(
+        (r) => console.log(`automations: fired ${r.fired}, skipped ${r.skipped_already_done}, driver ${r.driver}`),
+        (err) => console.error('automation run failed', err?.stack || err),
+      ),
+    );
+  },
+
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, '') || '/';
@@ -174,6 +192,17 @@ async function ownerRoutes(path, request, env, ctxo) {
     ]);
     const a = ownerAttention(tasks, logs, today());
     return json({ ...a, overdue_checkins: overdueCheckins(checkins, today()) }, ctxo);
+  }
+
+  if (resource === 'automations') return automationRoutes(id, action, request, env, ctxo);
+
+  if (resource === 'outbox' && method === 'GET') {
+    const { results } = await D1.prepare(
+      `SELECT o.*, a.name AS automation_name FROM outbox o
+    LEFT JOIN automations a ON a.id = o.automation_id
+       ORDER BY o.created_at DESC, o.rowid DESC LIMIT 100`,
+    ).all();
+    return json({ outbox: results ?? [], driver: driverName(env) }, ctxo);
   }
 
   if (resource === 'people') return peopleRoutes(id, action, request, env, ctxo);
@@ -501,6 +530,321 @@ async function sendQuote(row, request, env, ctxo) {
   );
 }
 
+/* ------------------------------------------- Phase 3: automation engine */
+
+/**
+ * Build the snapshot the engine reasons over.
+ *
+ * The engine is a pure function of this, which is what makes a dry run and a
+ * real run the same code path.
+ */
+async function buildWorld(env) {
+  const D1 = env.DB;
+  const now = today();
+  const [d, checkins] = await Promise.all([db.dashboardData(D1), db.allCheckins(D1)]);
+
+  const tasksByJob = new Map();
+  for (const [jobId, rows] of d.rawTasksByJob) {
+    tasksByJob.set(jobId, rows.map((t) => taskState(t, now)));
+  }
+
+  const risks = atRiskJobs(d.jobs, {
+    crewByJob: d.crewByJob,
+    costsByJob: d.costsByJob,
+    tasksByJob,
+    logsByJob: d.logsByJob,
+  }, now);
+
+  const jobById = new Map(d.jobs.map((j) => [j.id, j]));
+  const peopleById = new Map(d.people.map((p) => [p.id, p]));
+
+  const escalatedTasks = [];
+  for (const [jobId, rows] of tasksByJob) {
+    for (const t of rows) {
+      if (!t.escalated) continue;
+      const job = jobById.get(jobId);
+      escalatedTasks.push({
+        ...t,
+        person_name: peopleById.get(t.person_id)?.name || null,
+        client_name: job?.client_name,
+        site_address: job?.site_address,
+      });
+    }
+  }
+
+  // "Onboarded" means somebody has actually been given work. It is a real
+  // signal, and it stops the rule pestering an owner about people who were
+  // already up and running before the automation existed.
+  const onboardedPersonIds = new Set(d.allTasks.map((t) => t.person_id).filter(Boolean));
+
+  return {
+    world: {
+      today: now,
+      globals: { business_name: env.BUSINESS_NAME || 'the office' },
+      invoices: d.invoices,
+      jobs: d.jobs,
+      risks,
+      checkins,
+      people: d.people,
+      escalatedTasks,
+      onboardedPersonIds,
+    },
+    jobById,
+    peopleById,
+  };
+}
+
+/**
+ * Execute planned actions.
+ *
+ * `dryRun` short-circuits every write, including the dedupe record, so a preview
+ * shows exactly what a real run would do and changes nothing.
+ */
+async function runAutomations(env, { dryRun = false } = {}) {
+  const D1 = env.DB;
+  const { world, jobById, peopleById } = await buildWorld(env);
+
+  const [{ results: rules }, { results: runs }] = await Promise.all([
+    D1.prepare('SELECT * FROM automations WHERE enabled = 1').all(),
+    D1.prepare('SELECT dedupe_key FROM automation_runs').all(),
+  ]);
+
+  const parsed = (rules ?? []).map((r) => ({
+    ...r,
+    enabled: !!r.enabled,
+    trigger_config: safeJson(r.trigger_config, {}),
+    conditions: safeJson(r.conditions, []),
+    actions: safeJson(r.actions, []),
+  }));
+
+  const firedKeys = new Set((runs ?? []).map((r) => r.dedupe_key));
+  const { plans, skipped } = planActions(parsed, world, firedKeys);
+
+  const performed = [];
+  for (const plan of plans) {
+    const job = plan.context.job_id ? jobById.get(plan.context.job_id) : null;
+    const person = plan.context.person_id ? peopleById.get(plan.context.person_id) : null;
+    const ctx = {
+      client: job ? { name: job.client_name, phone: job.client_phone, email: job.client_email } : { name: plan.context.client_name },
+      person: person ? { name: person.name, phone: person.phone, email: person.email } : null,
+    };
+
+    const taken = [];
+    for (const action of plan.actions) {
+      taken.push(await performAction(env, { action, plan, ctx, job, person, dryRun }));
+    }
+
+    if (!dryRun) {
+      await D1.prepare(
+        `INSERT OR IGNORE INTO automation_runs (id, automation_id, dedupe_key, entity_type, entity_id, actions_taken)
+         VALUES (?1,?2,?3,?4,?5,?6)`,
+      ).bind(newId('run'), plan.automation_id, plan.dedupe_key, plan.entity_type,
+        plan.entity_id, JSON.stringify(taken)).run();
+    }
+
+    performed.push({
+      automation: plan.automation_name,
+      entity_type: plan.entity_type,
+      entity_id: plan.entity_id,
+      actions: taken,
+    });
+  }
+
+  return {
+    dry_run: dryRun,
+    ran_at: new Date().toISOString(),
+    driver: driverName(env),
+    fired: performed.length,
+    skipped_already_done: skipped,
+    results: performed,
+  };
+}
+
+async function performAction(env, { action, plan, ctx, job, person, dryRun }) {
+  const D1 = env.DB;
+
+  if (action.type === 'create_task') {
+    const due = action.due_in_days != null
+      ? addDays(today(), Number(action.due_in_days) || 0)
+      : null;
+    if (!dryRun && job) {
+      await D1.prepare(
+        `INSERT INTO tasks (id, job_id, person_id, title, due_on, needs_photo)
+         VALUES (?1,?2,?3,?4,?5,?6)`,
+      ).bind(newId('task'), job.id, person?.id || null, action.title, due,
+        action.needs_photo ? 1 : 0).run();
+    }
+    return {
+      type: 'create_task',
+      title: action.title,
+      due_on: due,
+      // An onboarding rule fires on a person, who may not be on a job yet.
+      status: job ? (dryRun ? 'would_create' : 'created') : 'skipped_no_job',
+    };
+  }
+
+  if (action.type === 'flag_job') {
+    if (!dryRun && job) {
+      await D1.prepare(
+        'INSERT INTO site_logs (id, job_id, kind, body) VALUES (?1,?2,?3,?4)',
+      ).bind(newId('log'), job.id, 'issue', action.message).run();
+    }
+    return { type: 'flag_job', message: action.message, status: job ? (dryRun ? 'would_flag' : 'flagged') : 'skipped_no_job' };
+  }
+
+  // Messaging actions.
+  const to = resolveRecipient(action, ctx);
+  if (!to.ok) {
+    // Recorded as a failure with the reason, so the owner does not read
+    // "reminder sent" while an invoice sits silently unpaid.
+    if (!dryRun) await writeOutbox(D1, { plan, to, action, status: 'failed', error: to.reason });
+    return { type: action.type, channel: to.channel, status: 'failed', error: to.reason };
+  }
+
+  if (dryRun) {
+    // The preview must predict what a real run would actually do. An owner
+    // alert is delivered in-app whatever the messaging driver is, so calling it
+    // "would simulate" would understate it just as badly as the reverse.
+    const wouldBe = to.channel === 'owner_alert'
+      ? 'would_alert'
+      : driverName(env) === 'simulated' ? 'would_simulate' : 'would_send';
+    return {
+      type: action.type, channel: to.channel, to: to.recipient_name,
+      status: wouldBe, body: action.message,
+    };
+  }
+
+  const delivery = await deliver(env, {
+    channel: to.channel,
+    recipient: to.recipient,
+    recipient_name: to.recipient_name,
+    body: action.message,
+    entity_type: plan.entity_type,
+    entity_id: plan.entity_id,
+  });
+  await writeOutbox(D1, { plan, to, action, ...delivery });
+
+  return {
+    type: action.type, channel: to.channel, to: to.recipient_name,
+    status: delivery.status, provider: delivery.provider, error: delivery.error,
+    body: action.message,
+  };
+}
+
+async function writeOutbox(D1, { plan, to, action, status, provider, error }) {
+  await D1.prepare(
+    `INSERT INTO outbox (id, automation_id, channel, recipient, recipient_name, body,
+                         status, provider, error, entity_type, entity_id)
+     VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)`,
+  ).bind(
+    newId('out'), plan.automation_id, to.channel, to.recipient, to.recipient_name,
+    action.message, status, provider || null, error || null,
+    plan.entity_type, plan.entity_id,
+  ).run();
+}
+
+async function automationRoutes(id, action, request, env, ctxo) {
+  const D1 = env.DB;
+  const method = request.method;
+
+  if (!id && method === 'GET') {
+    const { results } = await D1.prepare('SELECT * FROM automations ORDER BY name').all();
+    const [{ results: runs }] = await Promise.all([
+      D1.prepare('SELECT automation_id, COUNT(*) AS n, MAX(fired_at) AS last FROM automation_runs GROUP BY automation_id').all(),
+    ]);
+    const stats = new Map((runs ?? []).map((r) => [r.automation_id, r]));
+
+    return json({
+      automations: (results ?? []).map((r) => ({
+        ...r,
+        enabled: !!r.enabled,
+        trigger_config: safeJson(r.trigger_config, {}),
+        conditions: safeJson(r.conditions, []),
+        actions: safeJson(r.actions, []),
+        times_fired: stats.get(r.id)?.n ?? 0,
+        last_fired: stats.get(r.id)?.last ?? null,
+      })),
+      // The catalogue drives the rule builder, so the UI can never offer a
+      // trigger or action the engine does not implement.
+      catalogue: {
+        triggers: Object.entries(TRIGGERS).map(([type, t]) => ({
+          type, label: t.label, entity: t.entity, params: t.params,
+        })),
+        actions: Object.entries(ACTIONS).map(([type, a]) => ({ type, label: a.label, fields: a.fields })),
+      },
+      messaging: { driver: driverName(env), drivers: DRIVERS },
+    }, ctxo);
+  }
+
+  if (id === 'run' && method === 'POST') {
+    const url = new URL(request.url);
+    return json(await runAutomations(env, { dryRun: url.searchParams.has('dry') }), ctxo);
+  }
+
+  if (!id && method === 'POST') {
+    const body = await readJson(request);
+    const rule = {
+      name: String(body.name || '').trim(),
+      trigger_type: body.trigger_type,
+      trigger_config: body.trigger_config || {},
+      conditions: body.conditions || [],
+      actions: body.actions || [],
+    };
+    const errors = validateAutomation(rule);
+    if (errors.length) return fail(400, errors[0], { errors }, ctxo);
+
+    const autoId = newId('auto');
+    await D1.prepare(
+      `INSERT INTO automations (id, name, enabled, trigger_type, trigger_config, conditions, actions)
+       VALUES (?1,?2,?3,?4,?5,?6,?7)`,
+    ).bind(autoId, rule.name, body.enabled === false ? 0 : 1, rule.trigger_type,
+      JSON.stringify(rule.trigger_config), JSON.stringify(rule.conditions),
+      JSON.stringify(rule.actions)).run();
+    return json({ id: autoId }, { ...ctxo, status: 201 });
+  }
+
+  if (id && method === 'PATCH') {
+    const body = await readJson(request);
+    const existing = await D1.prepare('SELECT * FROM automations WHERE id = ?1').bind(id).first();
+    if (!existing) return fail(404, 'Automation not found', {}, ctxo);
+
+    const merged = {
+      name: body.name ?? existing.name,
+      trigger_type: body.trigger_type ?? existing.trigger_type,
+      trigger_config: body.trigger_config ?? safeJson(existing.trigger_config, {}),
+      conditions: body.conditions ?? safeJson(existing.conditions, []),
+      actions: body.actions ?? safeJson(existing.actions, []),
+    };
+    const errors = validateAutomation(merged);
+    if (errors.length) return fail(400, errors[0], { errors }, ctxo);
+
+    await D1.prepare(
+      `UPDATE automations SET name = ?2, enabled = ?3, trigger_type = ?4,
+              trigger_config = ?5, conditions = ?6, actions = ?7
+        WHERE id = ?1`,
+    ).bind(id, merged.name, body.enabled === undefined ? existing.enabled : (body.enabled ? 1 : 0),
+      merged.trigger_type, JSON.stringify(merged.trigger_config),
+      JSON.stringify(merged.conditions), JSON.stringify(merged.actions)).run();
+    return json({ updated: id }, ctxo);
+  }
+
+  if (id && method === 'DELETE') {
+    await D1.prepare('DELETE FROM automations WHERE id = ?1').bind(id).run();
+    return json({ deleted: id }, ctxo);
+  }
+
+  return fail(404, 'Not found', {}, ctxo);
+}
+
+function safeJson(text, fallback) {
+  try {
+    const v = typeof text === 'string' ? JSON.parse(text) : text;
+    return v ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 /* ---------------------------------------------- Phase 2: owner dashboard */
 
 async function dashboardReport(env, ctxo) {
@@ -783,11 +1127,13 @@ async function jobRoutes(id, action, subId, request, env, ctxo) {
 
     const jobId = newId('job');
     await D1.prepare(
-      `INSERT INTO jobs (id, quote_id, client_name, site_address, job_type, status,
-                         budget_baseline, cost_baseline, target_start, target_end, notes)
-       VALUES (?1, NULL, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)`,
+      `INSERT INTO jobs (id, quote_id, client_name, client_phone, client_email, site_address,
+                         job_type, status, budget_baseline, cost_baseline,
+                         target_start, target_end, notes)
+       VALUES (?1, NULL, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`,
     ).bind(
-      jobId, client, body.site_address || null, jobType,
+      jobId, client, body.client_phone || null, body.client_email || null,
+      body.site_address || null, jobType,
       ['booked', 'in_progress', 'on_hold'].includes(body.status) ? body.status : 'booked',
       money(Number(body.budget_baseline) || 0),
       money(Number(body.cost_baseline) || 0),
@@ -1034,7 +1380,7 @@ async function jobRoutes(id, action, subId, request, env, ctxo) {
 
     const sets = [];
     const binds = [id];
-    for (const f of ['client_name', 'site_address', 'target_start', 'target_end', 'notes']) {
+    for (const f of ['client_name', 'client_phone', 'client_email', 'site_address', 'target_start', 'target_end', 'notes']) {
       if (body[f] === undefined) continue;
       binds.push(body[f]);
       sets.push(`${f} = ?${binds.length}`);
@@ -1463,12 +1809,15 @@ async function clientRoutes(path, request, env, ctxo) {
     await D1.batch([
       D1.prepare("UPDATE quotes SET status = 'accepted', accepted_at = datetime('now') WHERE id = ?1").bind(row.id),
       D1.prepare(
-        `INSERT INTO jobs (id, quote_id, client_name, site_address, job_type, status, budget_baseline, cost_baseline)
-         VALUES (?1,?2,?3,?4,?5,'booked',?6,?7)`,
+        `INSERT INTO jobs (id, quote_id, client_name, client_email, site_address, job_type,
+                           status, budget_baseline, cost_baseline)
+         VALUES (?1,?2,?3,?4,?5,?6,'booked',?7,?8)`,
       ).bind(
         jobId,
         row.id,
         row.client_name,
+        // So the client-care automations have somewhere to send to.
+        row.client_email,
         row.site_address,
         row.job_type,
         // The accepted total, extras included, becomes the job's budget baseline —

@@ -494,7 +494,7 @@ logDialog?.addEventListener('close', async () => {
 const newJobDialog = $('new-job-dialog');
 
 $('new-job-btn')?.addEventListener('click', () => {
-  for (const id of ['nj-client', 'nj-type', 'nj-site', 'nj-start', 'nj-end', 'nj-price', 'nj-cost']) {
+  for (const id of ['nj-client', 'nj-type', 'nj-site', 'nj-phone', 'nj-start', 'nj-end', 'nj-price', 'nj-cost']) {
     $(id).value = '';
   }
   newJobDialog.showModal();
@@ -512,6 +512,7 @@ newJobDialog?.addEventListener('close', async () => {
       client_name: client,
       job_type: type,
       site_address: $('nj-site').value.trim() || null,
+      client_phone: $('nj-phone').value.trim() || null,
       target_start: $('nj-start').value.trim() || null,
       target_end: $('nj-end').value.trim() || null,
       budget_baseline: Number($('nj-price').value) || 0,
