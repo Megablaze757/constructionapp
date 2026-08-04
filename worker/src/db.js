@@ -304,6 +304,122 @@ export async function getAssignments(db, jobId) {
   return results ?? [];
 }
 
+/* ------------------------------------------------------------- Phase 1 */
+
+export async function listTasks(db, jobId) {
+  const { results } = await db
+    .prepare(
+      `SELECT t.*, p.name AS person_name
+         FROM tasks t LEFT JOIN people p ON p.id = t.person_id
+        WHERE t.job_id = ?1
+        ORDER BY t.status, COALESCE(t.due_on, '9999'), t.rowid`,
+    )
+    .bind(jobId)
+    .all();
+  return (results ?? []).map((t) => ({ ...t, needs_photo: !!t.needs_photo }));
+}
+
+/** Every live task, for the owner's attention list. */
+export async function allOpenTasks(db) {
+  const { results } = await db
+    .prepare(
+      `SELECT t.*, p.name AS person_name, j.client_name, j.site_address
+         FROM tasks t
+    LEFT JOIN people p ON p.id = t.person_id
+         JOIN jobs j ON j.id = t.job_id
+        WHERE t.status != 'cancelled' AND j.status != 'complete'`,
+    )
+    .all();
+  return (results ?? []).map((t) => ({ ...t, needs_photo: !!t.needs_photo }));
+}
+
+export async function listSiteLogs(db, jobId, limit = 50) {
+  const { results } = await db
+    .prepare(
+      `SELECT l.*, p.name AS person_name
+         FROM site_logs l LEFT JOIN people p ON p.id = l.person_id
+        WHERE l.job_id = ?1
+        ORDER BY l.created_at DESC, l.rowid DESC LIMIT ?2`,
+    )
+    .bind(jobId, limit)
+    .all();
+  return results ?? [];
+}
+
+export async function recentSiteLogs(db, limit = 60) {
+  const { results } = await db
+    .prepare(
+      `SELECT l.*, p.name AS person_name, j.client_name, j.site_address
+         FROM site_logs l
+    LEFT JOIN people p ON p.id = l.person_id
+         JOIN jobs j ON j.id = l.job_id
+        ORDER BY l.created_at DESC, l.rowid DESC LIMIT ?1`,
+    )
+    .bind(limit)
+    .all();
+  return results ?? [];
+}
+
+export async function listCheckins(db, jobId) {
+  const { results } = await db
+    .prepare('SELECT * FROM client_checkins WHERE job_id = ?1 ORDER BY COALESCE(due_on, \'9999\'), rowid')
+    .bind(jobId)
+    .all();
+  return results ?? [];
+}
+
+export async function allCheckins(db) {
+  const { results } = await db
+    .prepare(
+      `SELECT c.*, j.client_name, j.site_address
+         FROM client_checkins c JOIN jobs j ON j.id = c.job_id
+        WHERE j.status != 'complete'`,
+    )
+    .all();
+  return results ?? [];
+}
+
+export async function personByToken(db, token) {
+  const row = await db
+    .prepare('SELECT * FROM people WHERE access_token = ?1 AND active = 1')
+    .bind(token)
+    .first();
+  return row ? { ...row, active: !!row.active } : null;
+}
+
+/** The jobs a person is actually on — the whole scope of their crew view. */
+export async function jobsForPerson(db, personId) {
+  const { results } = await db
+    .prepare(
+      `SELECT j.*, a.role_on_job
+         FROM jobs j JOIN job_assignments a ON a.job_id = j.id
+        WHERE a.person_id = ?1 AND j.status != 'complete'
+        ORDER BY CASE j.status WHEN 'in_progress' THEN 0 WHEN 'booked' THEN 1 ELSE 2 END,
+                 COALESCE(j.target_start, j.created_at)`,
+    )
+    .bind(personId)
+    .all();
+  return results ?? [];
+}
+
+export async function tasksForPerson(db, personId) {
+  const { results } = await db
+    .prepare(
+      `SELECT t.*, j.client_name, j.site_address
+         FROM tasks t JOIN jobs j ON j.id = t.job_id
+        WHERE t.person_id = ?1 AND t.status != 'cancelled' AND j.status != 'complete'
+        ORDER BY COALESCE(t.due_on, '9999'), t.rowid`,
+    )
+    .bind(personId)
+    .all();
+  return (results ?? []).map((t) => ({ ...t, needs_photo: !!t.needs_photo }));
+}
+
+export async function getJobPhotoBytes(db, photoId) {
+  const row = await db.prepare('SELECT mime, bytes FROM job_photos WHERE id = ?1').bind(photoId).first();
+  return row ? { mime: row.mime, bytes: toBytes(row.bytes) } : null;
+}
+
 export async function listInvoices(db) {
   const { results } = await db
     .prepare(

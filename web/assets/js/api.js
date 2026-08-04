@@ -116,6 +116,18 @@ export const api = {
   patchInvoice: (id, i) => request(`/api/invoices/${id}`, { method: 'PATCH', body: i }),
   cash: () => request('/api/reports/cash'),
 
+  // Phase 1 — delegation
+  attention: () => request('/api/reports/attention'),
+  crewLink: (personId) => request(`/api/people/${personId}/link`, { method: 'POST' }),
+  addTask: (jobId, t) => request(`/api/jobs/${jobId}/tasks`, { method: 'POST', body: t }),
+  patchTask: (jobId, taskId, t) =>
+    request(`/api/jobs/${jobId}/tasks/${taskId}`, { method: 'PATCH', body: t }),
+  addLog: (jobId, l) => request(`/api/jobs/${jobId}/log`, { method: 'POST', body: l }),
+  ackLog: (jobId, logId) => request(`/api/jobs/${jobId}/log/${logId}`, { method: 'PATCH' }),
+  scheduleCheckins: (jobId) => request(`/api/jobs/${jobId}/checkins`, { method: 'POST' }),
+  patchCheckin: (jobId, id, data) =>
+    request(`/api/jobs/${jobId}/checkins/${id}`, { method: 'PATCH', body: data }),
+
   /**
    * Owner-side photo bytes as an object URL.
    * An <img src> cannot carry an Authorization header, so the bytes are fetched

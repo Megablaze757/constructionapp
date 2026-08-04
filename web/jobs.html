@@ -56,6 +56,30 @@
     </div>
 
     <div class="card">
+      <h2>Tasks <span id="task-badge" class="badge badge-ok">—</span></h2>
+      <div class="lines" id="task-list"></div>
+      <div class="card-body">
+        <button class="btn" id="add-task-btn" type="button">+ Assign a task</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Site log</h2>
+      <div class="lines" id="log-list"></div>
+      <div class="card-body">
+        <button class="btn" id="add-log-btn" type="button">+ Add an entry</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Client check-ins</h2>
+      <div class="lines" id="checkin-list"></div>
+      <div class="card-body">
+        <button class="btn" id="schedule-checkins-btn" type="button">Schedule check-ins</button>
+      </div>
+    </div>
+
+    <div class="card">
       <h2>Who's on it</h2>
       <div class="lines" id="crew-list"></div>
       <div class="card-body">
@@ -150,6 +174,54 @@
     <div class="btn-row">
       <button class="btn" value="cancel" type="submit">Cancel</button>
       <button class="btn btn-primary" value="save" type="submit">Create job</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="task-dialog">
+  <form method="dialog" class="card-body">
+    <h2>Assign a task</h2>
+    <label>What needs doing?
+      <input type="text" id="t-title" autocomplete="off">
+    </label>
+    <label>Who owns it?
+      <select id="t-person"></select>
+    </label>
+    <label>Due
+      <input type="text" id="t-due" placeholder="YYYY-MM-DD" autocomplete="off">
+    </label>
+    <label>Escalate to me after (days past due)
+      <input type="number" id="t-grace" min="0" step="1" value="2" inputmode="numeric">
+    </label>
+    <label class="inline-check">
+      <input type="checkbox" id="t-photo">
+      <span>Needs a photo as proof</span>
+    </label>
+    <div class="btn-row">
+      <button class="btn" value="cancel" type="submit">Cancel</button>
+      <button class="btn btn-primary" value="save" type="submit">Assign</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="log-dialog">
+  <form method="dialog" class="card-body">
+    <h2>Site log entry</h2>
+    <label>What happened?
+      <textarea id="l-body" rows="4"></textarea>
+    </label>
+    <label>Type
+      <select id="l-kind">
+        <option value="progress">Progress</option>
+        <option value="issue">Problem</option>
+        <option value="delay">Delay</option>
+        <option value="delivery">Delivery</option>
+        <option value="safety">Safety</option>
+      </select>
+    </label>
+    <div class="btn-row">
+      <button class="btn" value="cancel" type="submit">Cancel</button>
+      <button class="btn btn-primary" value="save" type="submit">Add</button>
     </div>
   </form>
 </dialog>

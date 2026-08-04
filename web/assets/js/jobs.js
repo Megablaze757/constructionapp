@@ -95,6 +95,135 @@ async function loadJob() {
   }
 }
 
+/* ------------------------------------------------------------- tasks */
+
+function renderTasks() {
+  const p = state.task_progress || { total: 0, done: 0, escalated: 0, percent: 0 };
+  $('task-badge').className = `badge ${p.escalated ? 'badge-bad' : p.total && p.done === p.total ? 'badge-ok' : 'badge-warn'}`;
+  $('task-badge').textContent = p.total ? `${p.done}/${p.total}` : '—';
+
+  const host = $('task-list');
+  host.innerHTML = (state.tasks || []).length
+    ? state.tasks.map((t) => `
+        <div class="line ${t.escalated ? 'unconfirmed' : ''}">
+          <div class="line-desc">
+            ${t.escalated ? '<span class="dot"></span>' : ''}
+            <span${t.done ? ' style="text-decoration:line-through;opacity:.6"' : ''}>${esc(t.title)}</span>
+            ${t.needs_photo ? '<span class="tag tag-ai">📷 proof</span>' : ''}
+            ${t.awaiting_photo ? '<span class="tag tag-ai">awaiting photo</span>' : ''}
+          </div>
+          <div class="line-price">${t.escalated ? `<span class="badge badge-bad">${t.days_late}d</span>` : ''}</div>
+          <div class="line-qty">
+            ${esc(t.person_name || 'nobody assigned')}
+            ${t.due_on ? ` · due ${esc(formatDate(t.due_on))}` : ''}
+            ${t.status === 'cancelled' ? ' · cancelled' : ''}
+          </div>
+          <div class="line-actions">
+            ${!t.done && t.status !== 'cancelled'
+              ? `<button class="btn btn-sm" data-task-done="${esc(t.id)}" type="button">Mark done</button>` : ''}
+            ${t.status !== 'cancelled' && !t.done
+              ? `<button class="btn btn-sm btn-danger" data-task-cancel="${esc(t.id)}" type="button">Cancel</button>` : ''}
+          </div>
+        </div>`).join('')
+    : '<div class="card-body muted">No tasks yet.</div>';
+
+  host.querySelectorAll('[data-task-done]').forEach((b) =>
+    b.addEventListener('click', () => patchTask(b.dataset.taskDone, { status: 'done' })));
+  host.querySelectorAll('[data-task-cancel]').forEach((b) =>
+    b.addEventListener('click', () => patchTask(b.dataset.taskCancel, { status: 'cancelled' })));
+}
+
+async function patchTask(taskId, data) {
+  try {
+    const res = await api.patchTask(jobId, taskId, data);
+    state.tasks = res.tasks;
+    state.task_progress = res.task_progress;
+    renderTasks();
+  } catch (err) { reportError(err); }
+}
+
+/* ---------------------------------------------------------- site log */
+
+const LOG_TONE = { issue: 'bad', delay: 'bad', safety: 'bad', delivery: 'warn', progress: '' };
+
+function renderLogs() {
+  const host = $('log-list');
+  host.innerHTML = (state.logs || []).length
+    ? state.logs.map((l) => {
+      const needsAck = ['issue', 'delay', 'safety'].includes(l.kind) && !l.acknowledged_at;
+      return `
+        <div class="line ${needsAck ? 'unconfirmed' : ''}">
+          <div class="line-desc">
+            ${needsAck ? '<span class="dot"></span>' : ''}
+            <span class="tag ${LOG_TONE[l.kind] === 'bad' ? 'tag-ai' : ''}">${esc(l.kind)}</span>
+            <span>${esc(l.person_name || 'office')}</span>
+          </div>
+          <div class="line-price muted" style="font-size:13px">${esc(formatDate(l.created_at))}</div>
+          <div class="line-qty" style="color:var(--ink)">${esc(l.body)}</div>
+          ${needsAck ? `<div class="line-actions">
+            <button class="btn btn-sm btn-primary" data-ack="${esc(l.id)}" type="button">Seen it</button>
+          </div>` : ''}
+        </div>`;
+    }).join('')
+    : '<div class="card-body muted">Nothing logged yet. Crew entries land here.</div>';
+
+  host.querySelectorAll('[data-ack]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      try {
+        state.logs = (await api.ackLog(jobId, b.dataset.ack)).logs;
+        renderLogs();
+      } catch (err) { reportError(err); }
+    }));
+}
+
+/* --------------------------------------------------------- check-ins */
+
+function renderCheckins() {
+  const host = $('checkin-list');
+  const rows = state.checkins || [];
+  const overdueIds = new Set((state.overdue_checkins || []).map((c) => c.id));
+
+  host.innerHTML = rows.length
+    ? rows.map((c) => `
+        <div class="line ${overdueIds.has(c.id) ? 'unconfirmed' : ''}">
+          <div class="line-desc">
+            ${overdueIds.has(c.id) ? '<span class="dot"></span>' : ''}
+            <span${c.status === 'done' ? ' style="text-decoration:line-through;opacity:.6"' : ''}>${esc(c.milestone)}</span>
+          </div>
+          <div class="line-price"></div>
+          <div class="line-qty">${c.due_on ? esc(formatDate(c.due_on)) : 'unscheduled'} · ${esc(c.status)}</div>
+          ${c.status === 'due' ? `<div class="line-actions">
+            <button class="btn btn-sm btn-primary" data-checkin-done="${esc(c.id)}" type="button">Done</button>
+            <button class="btn btn-sm" data-checkin-skip="${esc(c.id)}" type="button">Skip</button>
+          </div>` : ''}
+        </div>`).join('')
+    : '<div class="card-body muted">No check-ins scheduled.</div>';
+
+  $('schedule-checkins-btn').hidden = rows.length > 0;
+
+  const patch = async (id, status) => {
+    try {
+      const res = await api.patchCheckin(jobId, id, { status });
+      state.checkins = res.checkins;
+      state.overdue_checkins = res.overdue_checkins;
+      renderCheckins();
+    } catch (err) { reportError(err); }
+  };
+  host.querySelectorAll('[data-checkin-done]').forEach((b) =>
+    b.addEventListener('click', () => patch(b.dataset.checkinDone, 'done')));
+  host.querySelectorAll('[data-checkin-skip]').forEach((b) =>
+    b.addEventListener('click', () => patch(b.dataset.checkinSkip, 'skipped')));
+}
+
+$('schedule-checkins-btn')?.addEventListener('click', async () => {
+  try {
+    const res = await api.scheduleCheckins(jobId);
+    state.checkins = res.checkins;
+    state.overdue_checkins = res.overdue_checkins;
+    renderCheckins();
+  } catch (err) { reportError(err); }
+});
+
 /* -------------------------------------------------------------- crew */
 
 function renderCrew() {
@@ -213,6 +342,9 @@ function renderJob() {
   $('job-status').value = job.status;
   renderCrew();
   renderSops();
+  renderTasks();
+  renderLogs();
+  renderCheckins();
 
   const measured = costs.length > 0;
   const over = v.cost_variance > 0;
@@ -304,6 +436,57 @@ dialog?.addEventListener('close', async () => {
   } catch (err) {
     reportError(err);
   }
+});
+
+/* --------------------------------------------------- task & log dialogs */
+
+const taskDialog = $('task-dialog');
+const logDialog = $('log-dialog');
+
+$('add-task-btn')?.addEventListener('click', () => {
+  $('t-title').value = '';
+  $('t-due').value = '';
+  $('t-grace').value = '2';
+  $('t-photo').checked = false;
+  $('t-person').innerHTML = '<option value="">Nobody yet</option>'
+    + state.crew.map((c) => `<option value="${esc(c.person_id)}">${esc(c.name)}</option>`).join('')
+    + state.people.filter((p) => !state.crew.some((c) => c.person_id === p.id))
+        .map((p) => `<option value="${esc(p.id)}">${esc(p.name)} (not on this job)</option>`).join('');
+  taskDialog.showModal();
+});
+
+taskDialog?.addEventListener('close', async () => {
+  if (taskDialog.returnValue !== 'save') return;
+  const title = $('t-title').value.trim();
+  if (!title) return banner('bad', 'Say what needs doing.');
+  try {
+    const res = await api.addTask(jobId, {
+      title,
+      person_id: $('t-person').value || null,
+      due_on: $('t-due').value.trim() || null,
+      needs_photo: $('t-photo').checked,
+      grace_days: Number($('t-grace').value) || 0,
+    });
+    state.tasks = res.tasks;
+    state.task_progress = res.task_progress;
+    renderTasks();
+  } catch (err) { reportError(err); }
+});
+
+$('add-log-btn')?.addEventListener('click', () => {
+  $('l-body').value = '';
+  $('l-kind').value = 'progress';
+  logDialog.showModal();
+});
+
+logDialog?.addEventListener('close', async () => {
+  if (logDialog.returnValue !== 'save') return;
+  const body = $('l-body').value.trim();
+  if (!body) return banner('bad', 'Write what happened.');
+  try {
+    state.logs = (await api.addLog(jobId, { kind: $('l-kind').value, body })).logs;
+    renderLogs();
+  } catch (err) { reportError(err); }
 });
 
 /* ---------------------------------------------------------- new job */

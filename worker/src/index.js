@@ -17,6 +17,12 @@ import { suggestTemplates } from './templates.js';
 import {
   invoiceState, summariseInvoices, nextInvoiceNumber, sopProgress,
 } from './invoicing.js';
+import {
+  taskState, ownerAttention, taskProgress, plannedCheckins, overdueCheckins, visibleSops,
+} from './delegation.js';
+
+/** Cap on a job photo, after the browser has downscaled it. */
+const MAX_JOB_PHOTO_BYTES = 1_000_000;
 
 /** Today as an ISO date. Injected into the money maths so it stays testable. */
 const today = () => new Date().toISOString().slice(0, 10);
@@ -43,6 +49,7 @@ export default {
         );
       }
       if (path.startsWith('/api/')) return await ownerRoutes(path, request, env, ctxo);
+      if (path.startsWith('/crew/')) return await crewRoutes(path, request, env, ctxo);
       if (path.startsWith('/q/')) return await clientRoutes(path, request, env, ctxo);
       return fail(404, 'Not found', {}, ctxo);
     } catch (err) {
@@ -150,7 +157,16 @@ async function ownerRoutes(path, request, env, ctxo) {
     return json(summariseInvoices(invoices, today()), ctxo);
   }
 
-  if (resource === 'people') return peopleRoutes(id, request, env, ctxo);
+  // What the owner actually needs to look at, across every running job.
+  if (resource === 'reports' && id === 'attention' && method === 'GET') {
+    const [tasks, logs, checkins] = await Promise.all([
+      db.allOpenTasks(D1), db.recentSiteLogs(D1), db.allCheckins(D1),
+    ]);
+    const a = ownerAttention(tasks, logs, today());
+    return json({ ...a, overdue_checkins: overdueCheckins(checkins, today()) }, ctxo);
+  }
+
+  if (resource === 'people') return peopleRoutes(id, action, request, env, ctxo);
   if (resource === 'sops') return sopRoutes(id, request, env, ctxo);
   if (resource === 'invoices') return invoiceRoutes(id, request, env, ctxo);
   if (resource === 'jobs') return jobRoutes(id, action, subId, request, env, ctxo);
@@ -477,9 +493,22 @@ async function sendQuote(row, request, env, ctxo) {
 
 /* ------------------------------------------------- Phase 0: team & SOPs */
 
-async function peopleRoutes(id, request, env, ctxo) {
+async function peopleRoutes(id, action, request, env, ctxo) {
   const D1 = env.DB;
   const method = request.method;
+
+  // Mint or rotate a crew link. Rotating is how access is revoked, so it is a
+  // deliberate action rather than something that happens on every edit.
+  if (id && action === 'link' && method === 'POST') {
+    const token = randomToken(26);
+    const res = await D1.prepare('UPDATE people SET access_token = ?2 WHERE id = ?1')
+      .bind(id, token).run();
+    if (!res.meta?.changes) return fail(404, 'Person not found', {}, ctxo);
+    return json({
+      token,
+      url: `${env.PUBLIC_APP_URL || ''}/crew.html?t=${token}`,
+    }, ctxo);
+  }
 
   if (!id && method === 'GET') {
     const url = new URL(request.url);
@@ -686,10 +715,13 @@ async function jobRoutes(id, action, subId, request, env, ctxo) {
   if (!job) return fail(404, 'Job not found', {}, ctxo);
 
   if (!action && method === 'GET') {
-    const [costs, crew, sops] = await Promise.all([
+    const [costs, crew, sops, tasks, logs, checkins] = await Promise.all([
       db.getJobCosts(D1, id),
       db.getAssignments(D1, id),
       db.listJobSops(D1, id),
+      db.listTasks(D1, id),
+      db.listSiteLogs(D1, id),
+      db.listCheckins(D1, id),
     ]);
     return json({
       job,
@@ -697,7 +729,128 @@ async function jobRoutes(id, action, subId, request, env, ctxo) {
       variance: jobVariance(job, costs),
       crew,
       sops: sops.map((s) => ({ ...s, progress: sopProgress(s.steps) })),
+      tasks: tasks.map((t) => taskState(t, today())),
+      task_progress: taskProgress(tasks, today()),
+      logs,
+      checkins,
+      overdue_checkins: overdueCheckins(checkins, today()),
     }, ctxo);
+  }
+
+  /* ----------------------------------------------------------- tasks */
+
+  if (action === 'tasks' && method === 'POST') {
+    const body = await readJson(request);
+    const title = String(body.title || '').trim();
+    if (!title) return fail(400, 'A task needs a title.', {}, ctxo);
+    await D1.prepare(
+      `INSERT INTO tasks (id, job_id, person_id, title, detail, due_on, needs_photo, grace_days)
+       VALUES (?1,?2,?3,?4,?5,?6,?7,?8)`,
+    ).bind(
+      newId('task'), id, body.person_id || null, title, body.detail || null,
+      body.due_on || null, body.needs_photo ? 1 : 0,
+      Number.isFinite(Number(body.grace_days)) ? Number(body.grace_days) : 2,
+    ).run();
+    return json(await tasksPayload(D1, id), { ...ctxo, status: 201 });
+  }
+
+  if (action === 'tasks' && method === 'PATCH' && subId) {
+    const body = await readJson(request);
+    const sets = [];
+    const binds = [subId, id];
+    const push = (col, val) => { binds.push(val); sets.push(`${col} = ?${binds.length}`); };
+
+    if (body.status) {
+      if (!['open', 'done', 'cancelled'].includes(body.status)) {
+        return fail(400, 'Unknown task status.', {}, ctxo);
+      }
+      push('status', body.status);
+      push('completed_at', body.status === 'done' ? new Date().toISOString() : null);
+      push('completed_by', body.status === 'done' ? (body.completed_by || null) : null);
+    }
+    for (const f of ['person_id', 'title', 'detail', 'due_on', 'photo_id']) {
+      if (body[f] !== undefined) push(f, body[f]);
+    }
+    if (body.needs_photo !== undefined) push('needs_photo', body.needs_photo ? 1 : 0);
+    if (body.grace_days !== undefined) push('grace_days', Number(body.grace_days) || 0);
+    if (!sets.length) return fail(400, 'No updatable fields supplied', {}, ctxo);
+
+    await D1.prepare(`UPDATE tasks SET ${sets.join(', ')} WHERE id = ?1 AND job_id = ?2`)
+      .bind(...binds).run();
+    return json(await tasksPayload(D1, id), ctxo);
+  }
+
+  /* -------------------------------------------------------- site log */
+
+  if (action === 'log' && method === 'POST') {
+    const body = await readJson(request);
+    const text = String(body.body || '').trim();
+    if (!text) return fail(400, 'Say what happened.', {}, ctxo);
+    await D1.prepare(
+      'INSERT INTO site_logs (id, job_id, person_id, kind, body, photo_id) VALUES (?1,?2,?3,?4,?5,?6)',
+    ).bind(
+      newId('log'), id, body.person_id || null,
+      ['progress', 'issue', 'delay', 'delivery', 'safety'].includes(body.kind) ? body.kind : 'progress',
+      text.slice(0, 4000), body.photo_id || null,
+    ).run();
+    return json({ logs: await db.listSiteLogs(D1, id) }, { ...ctxo, status: 201 });
+  }
+
+  // Acknowledging is what takes an issue off the owner's list — an explicit
+  // "I've seen this", not a side effect of loading a page.
+  if (action === 'log' && method === 'PATCH' && subId) {
+    await D1.prepare("UPDATE site_logs SET acknowledged_at = datetime('now') WHERE id = ?1 AND job_id = ?2")
+      .bind(subId, id).run();
+    return json({ logs: await db.listSiteLogs(D1, id) }, ctxo);
+  }
+
+  /* ------------------------------------------------------- check-ins */
+
+  if (action === 'checkins' && method === 'POST' && !subId) {
+    const existing = await db.listCheckins(D1, id);
+    if (existing.length) return fail(409, 'This job already has a check-in schedule.', {}, ctxo);
+    const planned = plannedCheckins(job);
+    await D1.batch(planned.map((c) =>
+      D1.prepare('INSERT INTO client_checkins (id, job_id, milestone, due_on) VALUES (?1,?2,?3,?4)')
+        .bind(newId('chk'), id, c.milestone, c.due_on)));
+    const checkins = await db.listCheckins(D1, id);
+    return json({ checkins, overdue_checkins: overdueCheckins(checkins, today()) }, { ...ctxo, status: 201 });
+  }
+
+  if (action === 'checkins' && method === 'PATCH' && subId) {
+    const body = await readJson(request);
+    if (!['due', 'done', 'skipped'].includes(body.status)) {
+      return fail(400, 'status must be due, done or skipped', {}, ctxo);
+    }
+    await D1.prepare(
+      `UPDATE client_checkins
+          SET status = ?3, note = COALESCE(?4, note),
+              done_at = CASE WHEN ?3 = 'done' THEN datetime('now') ELSE NULL END
+        WHERE id = ?1 AND job_id = ?2`,
+    ).bind(subId, id, body.status, body.note ?? null).run();
+    const checkins = await db.listCheckins(D1, id);
+    return json({ checkins, overdue_checkins: overdueCheckins(checkins, today()) }, ctxo);
+  }
+
+  /* ------------------------------------------------------ job photos */
+
+  if (action === 'photos' && method === 'POST') {
+    const body = await readJson(request);
+    const stored = await storeJobPhoto(D1, id, body);
+    if (stored.error) return fail(stored.status, stored.error, {}, ctxo);
+    return json({ photo_id: stored.id }, { ...ctxo, status: 201 });
+  }
+
+  if (action === 'photos' && method === 'GET' && subId) {
+    const photo = await db.getJobPhotoBytes(D1, subId);
+    if (!photo) return fail(404, 'Photo not found', {}, ctxo);
+    return new Response(photo.bytes, {
+      headers: {
+        'Content-Type': photo.mime,
+        'Cache-Control': 'private, max-age=3600',
+        ...corsHeaders(env, request),
+      },
+    });
   }
 
   /* ------------------------------------------------------------ crew */
@@ -919,6 +1072,192 @@ async function addPhoto(row, request, env, ctxo) {
   ).run();
 
   return json({ photos: await db.listPhotos(env.DB, row.id), id }, { ...ctxo, status: 201 });
+}
+
+async function tasksPayload(D1, jobId) {
+  const tasks = await db.listTasks(D1, jobId);
+  return {
+    tasks: tasks.map((t) => taskState(t, today())),
+    task_progress: taskProgress(tasks, today()),
+  };
+}
+
+/** Decode, size-check and store a job photo. Shared by the owner and crew paths. */
+async function storeJobPhoto(D1, jobId, body, uploadedBy = null) {
+  const mime = String(body.mime || '');
+  if (!/^image\/(jpeg|png|webp)$/.test(mime)) {
+    return { error: 'Photo must be a JPEG, PNG or WebP.', status: 400 };
+  }
+  let bytes;
+  try {
+    const b64 = String(body.data_base64 || '').replace(/^data:[^,]+,/, '');
+    const bin = atob(b64);
+    bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  } catch {
+    return { error: 'Photo data could not be decoded.', status: 400 };
+  }
+  if (!bytes.length) return { error: 'Photo is empty.', status: 400 };
+  if (bytes.length > MAX_JOB_PHOTO_BYTES) {
+    return { error: `Photo is ${Math.round(bytes.length / 1024)}KB; the limit is ${MAX_JOB_PHOTO_BYTES / 1024}KB.`, status: 413 };
+  }
+
+  const photoId = newId('jph');
+  await D1.prepare(
+    `INSERT INTO job_photos (id, job_id, uploaded_by, mime, bytes, width, height, caption)
+     VALUES (?1,?2,?3,?4,?5,?6,?7,?8)`,
+  ).bind(
+    photoId, jobId, uploadedBy, mime, bytes,
+    body.width ? Number(body.width) : null,
+    body.height ? Number(body.height) : null,
+    body.caption || null,
+  ).run();
+  return { id: photoId };
+}
+
+/* ------------------------------------------------------------------- crew */
+
+/**
+ * The crew view.
+ *
+ * Reached by an unguessable per-person link — no account, no password, nothing
+ * to forget on a roof in the rain. The token identifies the person, and every
+ * query is scoped to what they are actually assigned to, so it cannot be used to
+ * browse the business.
+ */
+async function crewRoutes(path, request, env, ctxo) {
+  const D1 = env.DB;
+  const seg = path.split('/').filter(Boolean);       // ['crew', token, action?, id?]
+  const [, token, action, actionId] = seg;
+  if (!token) return fail(404, 'Not found', {}, ctxo);
+
+  const person = await db.personByToken(D1, token);
+  if (!person) return fail(404, 'This link is not valid.', {}, ctxo);
+
+  /** Is this person actually on that job? Everything they write is gated on it. */
+  const onJob = async (jobId) => {
+    const row = await D1.prepare(
+      'SELECT 1 FROM job_assignments WHERE job_id = ?1 AND person_id = ?2',
+    ).bind(jobId, person.id).first();
+    return !!row;
+  };
+
+  if (!action && request.method === 'GET') {
+    const [jobs, tasks, library] = await Promise.all([
+      db.jobsForPerson(D1, person.id),
+      db.tasksForPerson(D1, person.id),
+      db.listSops(D1),
+    ]);
+
+    // SOPs are filtered per job by this person's role — they see what applies to
+    // them, not the whole manual.
+    const withSops = await Promise.all(jobs.map(async (j) => ({
+      ...j,
+      sops: visibleSops(library, { role: person.role, jobType: j.job_type }),
+      checklists: (await db.listJobSops(D1, j.id)).map((s) => ({ ...s, progress: sopProgress(s.steps) })),
+      recent_log: (await db.listSiteLogs(D1, j.id, 5)),
+    })));
+
+    return json({
+      person: { id: person.id, name: person.name, role: person.role, kind: person.kind },
+      jobs: withSops,
+      tasks: tasks.map((t) => taskState(t, today())),
+    }, ctxo);
+  }
+
+  if (action === 'photo' && request.method === 'POST') {
+    const body = await readJson(request);
+    if (!body.job_id || !(await onJob(body.job_id))) {
+      return fail(403, 'You are not on that job.', {}, ctxo);
+    }
+    const stored = await storeJobPhoto(D1, body.job_id, body, person.id);
+    if (stored.error) return fail(stored.status, stored.error, {}, ctxo);
+    return json({ photo_id: stored.id }, { ...ctxo, status: 201 });
+  }
+
+  if (action === 'tasks' && request.method === 'POST' && actionId) {
+    const body = await readJson(request);
+    const task = await D1.prepare('SELECT * FROM tasks WHERE id = ?1 AND person_id = ?2')
+      .bind(actionId, person.id).first();
+    if (!task) return fail(404, 'That task is not yours.', {}, ctxo);
+
+    if (task.needs_photo && body.done && !body.photo_id) {
+      // Refused rather than accepted-and-flagged: on the crew side the point is
+      // to ask for the photo while the person is still standing in front of it.
+      return fail(422, 'This one needs a photo before it can be ticked off.', {}, ctxo);
+    }
+
+    await D1.prepare(
+      `UPDATE tasks
+          SET status = ?2,
+              photo_id = COALESCE(?3, photo_id),
+              completed_at = CASE WHEN ?2 = 'done' THEN datetime('now') ELSE NULL END,
+              completed_by = CASE WHEN ?2 = 'done' THEN ?4 ELSE NULL END
+        WHERE id = ?1`,
+    ).bind(actionId, body.done ? 'done' : 'open', body.photo_id || null, person.id).run();
+
+    return json({ tasks: (await db.tasksForPerson(D1, person.id)).map((t) => taskState(t, today())) }, ctxo);
+  }
+
+  if (action === 'log' && request.method === 'POST') {
+    const body = await readJson(request);
+    if (!body.job_id || !(await onJob(body.job_id))) {
+      return fail(403, 'You are not on that job.', {}, ctxo);
+    }
+    const text = String(body.body || '').trim();
+    if (!text) return fail(400, 'Say what happened.', {}, ctxo);
+
+    await D1.prepare(
+      'INSERT INTO site_logs (id, job_id, person_id, kind, body, photo_id) VALUES (?1,?2,?3,?4,?5,?6)',
+    ).bind(
+      newId('log'), body.job_id, person.id,
+      ['progress', 'issue', 'delay', 'delivery', 'safety'].includes(body.kind) ? body.kind : 'progress',
+      text.slice(0, 4000), body.photo_id || null,
+    ).run();
+
+    return json({ logs: await db.listSiteLogs(D1, body.job_id, 5) }, { ...ctxo, status: 201 });
+  }
+
+  if (action === 'checklists' && request.method === 'PATCH' && actionId) {
+    const body = await readJson(request);
+    const row = await D1.prepare('SELECT * FROM job_sops WHERE id = ?1').bind(actionId).first();
+    if (!row || !(await onJob(row.job_id))) return fail(404, 'Checklist not found.', {}, ctxo);
+
+    const steps = JSON.parse(row.steps);
+    const idx = Number(body.step);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= steps.length) {
+      return fail(400, 'step must be a valid step index', {}, ctxo);
+    }
+    if (steps[idx].needs_photo && body.done && !body.photo_id && !steps[idx].photo_id) {
+      return fail(422, 'This step needs a photo before it can be ticked off.', {}, ctxo);
+    }
+    steps[idx] = {
+      ...steps[idx],
+      done: !!body.done,
+      done_at: body.done ? new Date().toISOString() : null,
+      done_by: body.done ? person.id : null,
+      photo_id: body.photo_id ?? steps[idx].photo_id ?? null,
+    };
+    await D1.prepare('UPDATE job_sops SET steps = ?2 WHERE id = ?1')
+      .bind(actionId, JSON.stringify(steps)).run();
+
+    const sops = await db.listJobSops(D1, row.job_id);
+    return json({ checklists: sops.map((s) => ({ ...s, progress: sopProgress(s.steps) })) }, ctxo);
+  }
+
+  // Photo bytes, scoped to a job this person is on.
+  if (action === 'photo' && request.method === 'GET' && actionId) {
+    const photo = await db.getJobPhotoBytes(D1, actionId);
+    if (!photo) return fail(404, 'Not found', {}, ctxo);
+    return new Response(photo.bytes, {
+      headers: {
+        'Content-Type': photo.mime,
+        'Cache-Control': 'private, max-age=3600',
+        ...corsHeaders(env, request),
+      },
+    });
+  }
+
+  return fail(404, 'Not found', {}, ctxo);
 }
 
 /* ----------------------------------------------------------------- client */

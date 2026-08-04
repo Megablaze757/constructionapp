@@ -277,6 +277,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .photo.photo-multi { grid-template-columns: 1fr 1fr; }
 .photo.photo-multi img { aspect-ratio: 1 / 1; }
 
+.sop-detail { border-top: 1px solid var(--line); padding: 8px 0; }
+.sop-detail summary { cursor: pointer; font-weight: 600; min-height: 32px; display: flex; align-items: center; }
+.sop-detail[open] summary { color: var(--brand); }
+
 /* Invoice aging strip */
 .aging { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 6px; }
 .aging-cell {

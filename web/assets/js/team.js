@@ -74,6 +74,8 @@ function openDialog(id) {
   $('p-rate').value = p?.day_rate ?? '';
   // Only offer "mark as left" for someone currently active.
   $('p-deactivate').hidden = !p || !p.active;
+  // A crew link only makes sense for someone who is still working here.
+  $('p-link').hidden = !p || !p.active;
   dialog.showModal();
 }
 
@@ -85,6 +87,17 @@ dialog.addEventListener('close', async () => {
   if (action === 'cancel') return;
 
   try {
+    if (action === 'link') {
+      const { url, token } = await api.crewLink(editingId);
+      // PUBLIC_APP_URL may not be set locally, so fall back to this origin.
+      const full = url && url.startsWith('http')
+        ? url
+        : `${location.origin}${location.pathname.replace(/team\.html$/, '')}crew.html?t=${token}`;
+      $('link-url').value = full;
+      $('open-link').href = full;
+      $('link-dialog').showModal();
+      return;
+    }
     if (action === 'deactivate') {
       await api.deactivatePerson(editingId);
       banner('ok', 'Marked as left. Their past jobs keep their name on them.');
@@ -106,6 +119,16 @@ dialog.addEventListener('close', async () => {
     await load();
   } catch (err) {
     reportError(err);
+  }
+});
+
+$('copy-link').addEventListener('click', async (e) => {
+  try {
+    await navigator.clipboard.writeText($('link-url').value);
+    e.currentTarget.textContent = 'Copied ✓';
+  } catch {
+    $('link-url').select();
+    e.currentTarget.textContent = 'Press ⌘/Ctrl+C';
   }
 });
 

@@ -68,9 +68,28 @@
       <button class="btn" value="cancel" type="submit">Cancel</button>
       <button class="btn btn-primary" value="save" type="submit">Save</button>
     </div>
+    <button class="btn" id="p-link" value="link" type="submit" hidden>
+      📱 Get their crew link
+    </button>
     <button class="btn btn-danger" id="p-deactivate" value="deactivate" type="submit" hidden>
       Mark as left
     </button>
+  </form>
+</dialog>
+
+<dialog id="link-dialog">
+  <form method="dialog" class="card-body">
+    <h2>Crew link</h2>
+    <p class="muted" style="margin:0">
+      Send this to them on WhatsApp. No login — they see only their own jobs and
+      tasks. Getting a new link cancels the old one.
+    </p>
+    <input type="text" id="link-url" readonly>
+    <div class="btn-row">
+      <button class="btn" id="copy-link" type="button">Copy</button>
+      <a class="btn btn-primary" id="open-link" target="_blank" rel="noopener">Open</a>
+    </div>
+    <button class="btn" value="close" type="submit">Done</button>
   </form>
 </dialog>
 
