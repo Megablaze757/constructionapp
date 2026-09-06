@@ -55,9 +55,20 @@ jobs:
       # by hand. If it still fails, the repository has Pages disabled or set to a
       # branch source: Settings → Pages → Build and deployment → Source: GitHub
       # Actions. That is the one setting no workflow can do for you.
-      - uses: actions/configure-pages@v5
+      - id: pages
+        uses: actions/configure-pages@v5
         with:
           enablement: true
+        continue-on-error: true
+
+      - name: Explain the one setting a workflow cannot change
+        if: steps.pages.outcome == 'failure'
+        run: |
+          echo "::error title=GitHub Pages is not enabled::Settings → Pages → Build and deployment → Source: GitHub Actions, then re-run this workflow."
+          echo "The workflow tried to enable Pages via the API and was refused, which means"
+          echo "Pages is off for this repository or pinned to a branch source. Enabling it is"
+          echo "a repository setting; GITHUB_TOKEN cannot grant itself the right to change it."
+          exit 1
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web
