@@ -36,6 +36,9 @@ jobs:
           AI_BASE: ${{ vars.AI_BASE }}
           BUSINESS_NAME: ${{ vars.BUSINESS_NAME }}
         run: |
+          # Full Worker (D1) is optional. The live URL is the paste-in AI worker
+          # (service: builderos-ai) — that belongs in aiBase, not apiBase.
+          AI_BASE="${AI_BASE:-https://construction.fitnessguru.workers.dev}"
           {
             echo "window.BUILDEROS_CONFIG = {"
             echo "  apiBase: '${API_BASE}',"
@@ -43,8 +46,8 @@ jobs:
             echo "  businessName: '${BUSINESS_NAME:-Builder Co.}',"
             echo "};"
           } > web/config.js
-          if [ -z "$API_BASE" ] && [ -z "$AI_BASE" ]; then
-            echo "::notice::Neither API_BASE nor AI_BASE is set — the site will run in local mode."
+          if [ -z "$API_BASE" ]; then
+            echo "::notice::API_BASE unset — quotes stay on-device; AI drafts go to ${AI_BASE}."
           fi
           cat web/config.js
           # Stop Jekyll from hiding files/folders; this is a static app, not a blog.

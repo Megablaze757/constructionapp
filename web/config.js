@@ -24,6 +24,6 @@
  */
 window.BUILDEROS_CONFIG = {
   apiBase: 'http://127.0.0.1:8787',
-  aiBase: '',
+  aiBase: 'https://construction.fitnessguru.workers.dev',
   businessName: 'Builder Co.',
 };
