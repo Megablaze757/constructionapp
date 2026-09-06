@@ -14,17 +14,14 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+# Publish to the gh-pages branch. That matches GitHub's default Pages source
+# (Deploy from a branch) — GITHUB_TOKEN cannot switch Source to GitHub Actions.
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -50,27 +47,21 @@ jobs:
             echo "::notice::Neither API_BASE nor AI_BASE is set — the site will run in local mode."
           fi
           cat web/config.js
+          # Stop Jekyll from hiding files/folders; this is a static app, not a blog.
+          touch web/.nojekyll
 
-      # `enablement` turns Pages on via the API when it has not been switched on
-      # by hand. If it still fails, the repository has Pages disabled or set to a
-      # branch source: Settings → Pages → Build and deployment → Source: GitHub
-      # Actions. That is the one setting no workflow can do for you.
-      - id: pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-        continue-on-error: true
-
-      - name: Explain the one setting a workflow cannot change
-        if: steps.pages.outcome == 'failure'
+      - name: Publish web/ to the gh-pages branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "::error title=GitHub Pages is not enabled::Settings → Pages → Build and deployment → Source: GitHub Actions, then re-run this workflow."
-          echo "The workflow tried to enable Pages via the API and was refused, which means"
-          echo "Pages is off for this repository or pinned to a branch source. Enabling it is"
-          echo "a repository setting; GITHUB_TOKEN cannot grant itself the right to change it."
-          exit 1
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: web
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          set -euo pipefail
+          cd web
+          git init
+          git checkout -b gh-pages
+          git add -A
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Publish web to GitHub Pages"
+          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
+          echo "::notice::Published. In Settings → Pages, set Source to Deploy from a branch, Branch gh-pages, folder / (root)."
+          echo "Site: https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/"

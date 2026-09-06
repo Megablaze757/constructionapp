@@ -37,9 +37,15 @@ Nothing at all for step 0. For the rest:
 
 ## 0. Pages on its own (no Worker)
 
-**Settings → Pages → Build and deployment → Source: GitHub Actions**, then push to
-`main`. With neither `API_BASE` nor `AI_BASE` set, the published site runs
-everything locally and says so at the top of every screen.
+Push to `main`. The Pages workflow publishes `web/` to the `gh-pages` branch.
+GitHub then serves it from that branch — no need to switch Pages over to
+“GitHub Actions” (that setting cannot be changed from a workflow, which is why
+deploys used to fail). If the site 404s after the first green run, set
+**Settings → Pages → Build and deployment → Source: Deploy from a branch**,
+branch `gh-pages`, folder `/ (root)`.
+
+With neither `API_BASE` nor `AI_BASE` set, the published site runs everything
+locally and says so at the top of every screen.
 
 What works: quoting, jobs, tasks, SOPs, invoicing, the dashboard, reliability, and
 the automation engine — all of it, against a real SQLite database in the browser.
@@ -154,8 +160,10 @@ the same as trusting it with the contract.
 
 ## 3. GitHub Pages
 
-In the repository: **Settings → Pages → Build and deployment → Source:
-GitHub Actions**.
+The workflow on `main` pushes `web/` to `gh-pages`. If Pages is not serving yet:
+**Settings → Pages → Build and deployment → Source: Deploy from a branch**,
+branch `gh-pages`, folder `/ (root)`. A first successful push of that branch
+usually turns Pages on by itself for a public repo.
 
 Then **Settings → Secrets and variables → Actions → Variables**, add:
 
