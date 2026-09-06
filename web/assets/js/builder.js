@@ -1,5 +1,5 @@
 import './pwa.js';
-import { api, ownerToken, API_BASE, price, titleCase, esc, ApiError } from './api.js';
+import { api, ready, price, titleCase, esc, ApiError } from './api.js';
 import { initPhotos } from './photos.js';
 
 const $ = (id) => document.getElementById(id);
@@ -25,7 +25,7 @@ function reportError(err) {
 /* ------------------------------------------------------------------- boot */
 
 async function boot() {
-  if (!API_BASE || !ownerToken.get() || !quoteId) {
+  if (!quoteId || !await ready()) {
     return banner('bad', 'Missing configuration or quote id. Go back to the <a href="index.html">quotes screen</a>.');
   }
   try {
@@ -63,17 +63,39 @@ function apply(payload) {
 function render() {
   const q = state.quote;
   $('title').textContent = q.status === 'draft' ? 'New Quote' : titleCase(q.status);
-  $('client_name').value = q.client_name || '';
-  $('site_address').value = q.site_address || '';
   $('job_type_display').value = titleCase(q.job_type);
-  // Don't clobber what the owner is mid-way through typing.
-  if (document.activeElement !== $('description')) $('description').value = q.description || '';
-  if (document.activeElement !== $('client_summary')) $('client_summary').value = q.client_summary || '';
+  syncHeader(q);
 
   renderAiSummary(q.ai_summary);
   renderLines();
   renderExtras();
   renderTotals();
+}
+
+const HEADER_FIELDS = ['client_name', 'site_address', 'description', 'client_summary'];
+
+/** Fields the owner has typed into since they were last saved. */
+const touched = new Set();
+for (const id of HEADER_FIELDS) {
+  $(id).addEventListener('input', () => touched.add(id));
+}
+
+/**
+ * Refresh the header fields without throwing away unsaved typing.
+ *
+ * Almost everything on this screen saves through the API and re-renders —
+ * confirming a line, editing a quantity, adding a photo. Each of those used to
+ * wipe whatever had been typed but not yet saved, so a client summary written
+ * before tapping "confirm" was gone by the time Send was pressed. Nobody notices
+ * that until the client asks what the job actually involves.
+ *
+ * Typing wins until it has been saved; after that the server's copy is the truth
+ * again.
+ */
+function syncHeader(q) {
+  for (const id of HEADER_FIELDS) {
+    if (!touched.has(id)) $(id).value = q[id] || '';
+  }
 }
 
 function renderAiSummary(summary) {
@@ -83,6 +105,12 @@ function renderAiSummary(summary) {
 
   const list = (items) => items.map((s) => `<li>${esc(s)}</li>`).join('');
   const parts = [];
+  // A template draft is not an estimate, and must not be allowed to look like
+  // one just because it appears in the same card.
+  if (summary.ai === false) {
+    parts.push('<div class="notice notice-bad"><strong>No AI is connected, so your description was not read.</strong>'
+      + ' These are the template\'s own default quantities. Check every one against this job.</div>');
+  }
   if (summary.flags_for_owner_review?.length) {
     parts.push(`<div class="notice notice-warn"><strong>Check before sending</strong><ul>${list(summary.flags_for_owner_review)}</ul></div>`);
   }
@@ -101,7 +129,7 @@ function renderAiSummary(summary) {
       .join('');
     parts.push(`<div class="notice" style="background:var(--surface-2);color:var(--ink-2)"><strong>Checked against past jobs</strong><ul>${rows}</ul></div>`);
   }
-  parts.push(`<p class="muted" style="margin:0">Drafted by ${esc(summary.model || 'AI')} · overall confidence ${esc(summary.confidence || '—')}</p>`);
+  parts.push(`<p class="muted" style="margin:0">Drafted ${summary.ai === false ? 'from' : 'by'} ${esc(summary.model || 'AI')} · overall confidence ${esc(summary.confidence || '—')}</p>`);
   $('ai-summary-body').innerHTML = parts.join('');
 }
 
@@ -241,16 +269,23 @@ async function confirmLine(id) {
   await saveLines();
 }
 
+/** The header fields, as typed. Shared by Save Draft and Send. */
+async function saveHeader() {
+  const saved = await api.patchQuote(quoteId, {
+    client_name: $('client_name').value.trim(),
+    site_address: $('site_address').value.trim(),
+    description: $('description').value,
+    client_summary: $('client_summary').value.trim(),
+  });
+  touched.clear();
+  return saved;
+}
+
 $('save-btn').addEventListener('click', async (e) => {
   const btn = e.currentTarget;
   btn.disabled = true;
   try {
-    apply(await api.patchQuote(quoteId, {
-      client_name: $('client_name').value.trim(),
-      site_address: $('site_address').value.trim(),
-      description: $('description').value,
-      client_summary: $('client_summary').value.trim(),
-    }));
+    apply(await saveHeader());
     btn.textContent = 'Saved ✓';
     setTimeout(() => (btn.textContent = 'Save Draft'), 1400);
   } catch (err) {
@@ -272,7 +307,9 @@ $('draft-btn').addEventListener('click', async (e) => {
   clearBanner();
   try {
     apply(await api.draft(quoteId, description, $('use-photos').checked));
-    banner('warn', '<strong>Draft ready.</strong> Items marked 🤖 need a tap to confirm before you can send.');
+    banner('warn', state.quote?.ai_summary?.ai === false
+      ? '<strong>Drafted from the template.</strong> No AI is connected, so nothing was read from your description — confirm every line before you can send.'
+      : '<strong>Draft ready.</strong> Items marked 🤖 need a tap to confirm before you can send.');
   } catch (err) {
     if (err instanceof ApiError && err.status === 502) {
       const detail = Array.isArray(err.body.detail) ? `<ul>${err.body.detail.map((d) => `<li>${esc(d)}</li>`).join('')}</ul>` : '';
@@ -421,6 +458,10 @@ async function trySend(overrideReason) {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Sending…';
   try {
+    // Send is the only button most owners press, so anything typed into the
+    // header goes with it — otherwise the client-facing summary they just wrote
+    // is silently dropped for want of a Save Draft.
+    await saveHeader();
     const res = await api.send(quoteId, overrideReason);
     const url = res.public_url?.startsWith('http')
       ? res.public_url

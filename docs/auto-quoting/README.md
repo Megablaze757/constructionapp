@@ -14,7 +14,7 @@ Parent: [BuilderOS system spec](../builderos-system-spec.md)
 | [`schemas/draft-quote.schema.json`](schemas/draft-quote.schema.json) | Machine-readable output contract for the AI draft assistant |
 
 **This module is built.** Phases A–C are running code — `web/` (GitHub Pages) and
-`worker/` (Cloudflare Workers + D1 + OpenRouter). See
+`worker/` (Cloudflare Workers + D1 + Groq). See
 [build status](#12-build-status) for what is and isn't done, and
 [deployment](../deployment.md) to run it.
 
@@ -335,7 +335,28 @@ a caller cannot route around:
 | **C — AI draft assistant** | Built. Typed or dictated description → draft line items, assumptions, flags, confidence, tap-to-confirm. |
 | **D — Photo estimating & learning loop** | Built. Site photos are uploaded, shown to the client, and read by the assistant to scale quantities; costs are captured against jobs; the [learning loop](#9a-the-learning-loop-phase-d-built) feeds measured drift back into drafting; and recurring quote shapes are offered as new templates. |
 
-All four phases of the module are now built. Known gaps, deliberately left:
+All four phases of the module are now built.
+
+### Drafting when there is no AI
+
+Drafting has three routes to a model, chosen by configuration and reported on
+`/health` as `ai_mode`:
+
+| Mode | When | What the owner gets |
+| --- | --- | --- |
+| `groq` | `GROQ_API_KEY` is set | the assistant, as specified above |
+| `proxy` | `AI_PROXY_URL` is set | the same, through a Worker that holds the key — validated again on this side, so the proxy is trusted with the key and not with the contract |
+| `template` | neither | the job template's own default quantities |
+
+The template route exists so the module works before any infrastructure does, and
+its whole value depends on it never being mistaken for an estimate. Every line comes
+back `template_default` at medium confidence with a note saying the description was
+never read; the builder replaces the "draft ready" banner with a warning, drops the
+🤖 tag entirely, and the send gate holds until each line has been confirmed. The
+provenance vocabulary was already carrying this distinction — `template_default` has
+been in the contract since Phase C — so nothing had to be loosened to allow it.
+
+Known gaps, deliberately left:
 
 - **Photo estimating is only as good as the photo.** The assistant is told to scale
   against something of known size and to flag what the frame cannot show, but a

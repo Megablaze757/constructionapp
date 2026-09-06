@@ -1,5 +1,5 @@
 /**
- * A stand-in for OpenRouter, for local development without an API key and for
+ * A stand-in for Groq, for local development without an API key and for
  * end-to-end tests.
  *
  * It does two useful things beyond returning a canned draft:
@@ -9,7 +9,7 @@
  *   - answers from the template it was given, so the line_code guardrail is
  *     exercised for real.
  *
- * Run: node dev/stub-openrouter.js [port]
+ * Run: node dev/stub-groq.js [port]
  */
 
 import { createServer } from 'node:http';
@@ -37,13 +37,20 @@ const server = createServer((req, res) => {
     }
 
     const problems = [];
-    if (payload.response_format?.type !== 'json_schema') {
-      problems.push('request did not ask for json_schema structured output');
+    // Either constraint is acceptable — the Worker tries json_schema and falls
+    // back to json_object on models that do not serve it. What is never
+    // acceptable is asking for unconstrained prose.
+    const format = payload.response_format?.type;
+    if (format !== 'json_schema' && format !== 'json_object') {
+      problems.push('request did not constrain the response to JSON');
     }
-    if (payload.response_format?.json_schema?.strict !== true) {
-      problems.push('request did not set strict: true');
+    if (format === 'json_schema' && payload.response_format?.json_schema?.strict !== true) {
+      problems.push('json_schema mode did not set strict: true');
     }
-    const schemaText = JSON.stringify(payload.response_format?.json_schema?.schema ?? {});
+    // In json_object mode the schema travels in the system prompt instead.
+    const schemaText = format === 'json_schema'
+      ? JSON.stringify(payload.response_format?.json_schema?.schema ?? {})
+      : String(payload.messages?.find((m) => m.role === 'system')?.content ?? '');
     for (const word of ['price', 'cost', 'rate', 'total']) {
       if (schemaText.includes(`"${word}`)) problems.push(`schema exposes a "${word}" field to the model`);
     }
@@ -212,5 +219,5 @@ function badDraft(codes) {
 }
 
 server.listen(port, '127.0.0.1', () => {
-  console.log(`[stub] OpenRouter stub listening on http://127.0.0.1:${port} (mode: ${MODE})`);
+  console.log(`[stub] Groq stub listening on http://127.0.0.1:${port} (mode: ${MODE})`);
 });

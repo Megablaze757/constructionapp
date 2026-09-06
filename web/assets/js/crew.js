@@ -6,7 +6,7 @@
  * away because half of what this screen exists to capture is photo proof.
  */
 
-import { API_BASE, formatDate, esc, ApiError } from './api.js';
+import { crewCall, formatDate, esc, ApiError } from './api.js';
 import { downscale } from './photos.js';
 
 const $ = (id) => document.getElementById(id);
@@ -20,21 +20,9 @@ const banner = (kind, html) =>
   ($('banner').innerHTML = `<div class="card"><div class="card-body"><div class="notice notice-${kind}">${html}</div></div></div>`);
 const clearBanner = () => ($('banner').innerHTML = '');
 
-async function call(path, options = {}) {
-  const res = await fetch(`${API_BASE}/crew/${encodeURIComponent(token)}${path}`, {
-    method: options.method || 'GET',
-    headers: options.body ? { 'Content-Type': 'application/json' } : {},
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
-  const text = await res.text();
-  let body = {};
-  try { body = text ? JSON.parse(text) : {}; } catch { body = { error: text.slice(0, 200) }; }
-  if (!res.ok) throw new ApiError(body.error || `Request failed (${res.status})`, res.status, body);
-  return body;
-}
+const call = (path, options) => crewCall(token, path, options);
 
 async function boot() {
-  if (!API_BASE) return banner('bad', 'This app is not configured.');
   if (!token) return banner('bad', 'This link is missing its code. Ask for a new one.');
   try {
     data = await call('');

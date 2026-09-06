@@ -1,5 +1,5 @@
 import './pwa.js';
-import { api, ownerToken, API_BASE, price, titleCase, formatDate, esc, ApiError } from './api.js';
+import { api, ready, price, titleCase, formatDate, esc, ApiError } from './api.js';
 
 const $ = (id) => document.getElementById(id);
 const jobId = new URLSearchParams(location.search).get('id');
@@ -17,7 +17,7 @@ function reportError(err) {
 }
 
 async function boot() {
-  if (!API_BASE || !ownerToken.get()) {
+  if (!await ready()) {
     return banner('bad', 'Not configured. Go to the <a href="index.html">quotes screen</a> and set your owner token.');
   }
   return jobId ? loadJob() : loadList();

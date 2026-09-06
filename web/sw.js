@@ -4,9 +4,13 @@
  * Deliberately never caches API responses. Quote totals, margins and statuses
  * change from other devices, and a stale price shown as current is worse than
  * no price at all — so /api/ and /q/ always go to the network.
+ *
+ * The shell includes the local backend — the SQLite engine, the schema, and the
+ * Worker's own source — because that is what makes the app work with no network
+ * at all rather than merely load and then fail.
  */
 
-const CACHE = 'builderos-shell-v6';
+const CACHE = 'builderos-shell-v7';
 const SHELL = [
   './',
   './index.html',
@@ -38,6 +42,18 @@ const SHELL = [
   './assets/js/crew.js',
   './assets/js/dashboard.js',
   './assets/js/automations.js',
+
+  // Local mode: the database engine, the schema, and the Worker itself.
+  './assets/vendor/sql-wasm.js',
+  './assets/vendor/sql-wasm.wasm',
+  './assets/schema.sql',
+  './assets/js/local/backend.js',
+  './assets/js/local/d1.js',
+  ...[
+    'automation', 'dashboard', 'db', 'delegation', 'fallback-draft', 'groq', 'http',
+    'index', 'invoicing', 'messaging', 'pricing', 'reliability', 'schema',
+    'templates', 'variance',
+  ].map((m) => `./assets/js/worker/${m}.js`),
 ];
 
 self.addEventListener('install', (event) => {

@@ -1,5 +1,7 @@
 import './pwa.js';
-import { api, ownerToken, API_BASE, price, titleCase, formatDate, esc, ApiError } from './api.js';
+import {
+  api, ready, isLocal, ownerToken, API_BASE, price, titleCase, formatDate, esc, ApiError,
+} from './api.js';
 
 const $ = (id) => document.getElementById(id);
 const banner = $('banner');
@@ -15,25 +17,43 @@ function clearBanner() {
 /* --------------------------------------------------------------- settings */
 
 const dialog = $('settings-dialog');
-$('settings-btn').addEventListener('click', () => {
-  $('api-base-display').value = API_BASE || '(not configured)';
+const AI_BASE_KEY = 'builderos.aiBase';
+const AI_TOKEN_KEY = 'builderos.aiToken';
+
+$('settings-btn').addEventListener('click', async () => {
+  const running = await ready();
+  $('api-base-display').value = API_BASE || '(no Worker — running in this browser)';
   $('owner-token').value = ownerToken.get();
+  $('ai-base').value = localStorage.getItem(AI_BASE_KEY) || '';
+  $('ai-token').value = localStorage.getItem(AI_TOKEN_KEY) || '';
+  $('mode-explainer').innerHTML = isLocal()
+    ? 'Nothing is deployed, so BuilderOS is running in this browser and storing everything on '
+      + 'this device. Deploy the Worker and set its URL to share the data, send client links '
+      + 'and give crew their own pages.'
+    : `Talking to your Cloudflare Worker. The owner token is the <code>OWNER_TOKEN</code> secret
+       you set on it, and is stored only in this browser.${running ? '' : ' Paste it below to start.'}`;
   dialog.showModal();
 });
+
 dialog.addEventListener('close', () => {
-  if (dialog.returnValue === 'save') {
-    ownerToken.set($('owner-token').value.trim());
-    location.reload();
+  if (dialog.returnValue !== 'save') return;
+  ownerToken.set($('owner-token').value.trim());
+  // Stored here rather than in config.js so it survives a redeploy of the site
+  // and can be set from a phone, which is where most of this gets used.
+  for (const [key, id] of [[AI_BASE_KEY, 'ai-base'], [AI_TOKEN_KEY, 'ai-token']]) {
+    const value = $(id).value.trim().replace(/\/$/, '');
+    if (value) localStorage.setItem(key, value);
+    else localStorage.removeItem(key);
   }
+  location.reload();
 });
 
 /* ------------------------------------------------------------------ boot */
 
 async function boot() {
-  if (!API_BASE) {
-    return showBanner('bad', '<strong>No API configured.</strong> Set <code>apiBase</code> in <code>config.js</code> to your Worker URL.');
-  }
-  if (!ownerToken.get()) {
+  // In local mode there is no Worker and no token to paste — ready() settles
+  // that first, and only then is a missing token actually a problem.
+  if (!await ready()) {
     return showBanner('warn', '<strong>Owner token needed.</strong> Open Settings and paste the <code>OWNER_TOKEN</code> you set on the Worker.');
   }
 

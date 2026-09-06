@@ -30,22 +30,26 @@ jobs:
 
       # The site is plain ES modules — nothing to build, so the artifact is the
       # directory as committed. Any bundler here would only add ways to break.
-      - name: Point the frontend at the deployed Worker
+      # Both are optional. With neither set the published site runs the Worker's
+      # own source in the browser and drafts from the job template — usable on
+      # day one, on one device, which the site says on every screen.
+      - name: Point the frontend at whatever has been deployed
         env:
           API_BASE: ${{ vars.API_BASE }}
+          AI_BASE: ${{ vars.AI_BASE }}
           BUSINESS_NAME: ${{ vars.BUSINESS_NAME }}
         run: |
-          if [ -n "$API_BASE" ]; then
-            {
-              echo "window.BUILDEROS_CONFIG = {"
-              echo "  apiBase: '${API_BASE}',"
-              echo "  businessName: '${BUSINESS_NAME:-Builder Co.}',"
-              echo "};"
-            } > web/config.js
-            echo "config.js written for ${API_BASE}"
-          else
-            echo "::warning::Repository variable API_BASE is not set; using the committed config.js."
+          {
+            echo "window.BUILDEROS_CONFIG = {"
+            echo "  apiBase: '${API_BASE}',"
+            echo "  aiBase: '${AI_BASE}',"
+            echo "  businessName: '${BUSINESS_NAME:-Builder Co.}',"
+            echo "};"
+          } > web/config.js
+          if [ -z "$API_BASE" ] && [ -z "$AI_BASE" ]; then
+            echo "::notice::Neither API_BASE nor AI_BASE is set — the site will run in local mode."
           fi
+          cat web/config.js
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

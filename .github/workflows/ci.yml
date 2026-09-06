@@ -1,0 +1,107 @@
+name: CI
+
+# Proves the thing actually runs, not just that its units pass. Every push boots
+# the real stack — Worker on local D1, the static site, and a stand-in for Groq —
+# and drives it through a browser exactly as a person would.
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      - run: npm ci
+        working-directory: worker
+      - run: npm test
+        working-directory: worker
+
+      # worker/paste/, web/assets/schema.sql and web/assets/js/worker/ are built
+      # from worker/src. An edit that never reached them would ship a dashboard
+      # paste and a browser fallback running last week's code.
+      - name: Generated files are current
+        working-directory: worker
+        run: |
+          npm run build:generated
+          git diff --exit-code -- ../worker/paste ../web/assets/schema.sql ../web/assets/js/worker \
+            || { echo '::error::run "npm run build:generated" in worker/ and commit the result'; exit 1; }
+
+  e2e:
+    name: End-to-end
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+
+      - name: Install
+        working-directory: worker
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Local secrets
+        working-directory: worker
+        # No real Groq key: the stub stands in, so CI costs nothing and cannot
+        # fail because a provider is rate-limiting.
+        run: cp .dev.vars.example .dev.vars
+
+      - name: Create the database
+        working-directory: worker
+        run: npm run db:local
+
+      - name: Start the stack
+        working-directory: worker
+        # Four processes: the Groq stand-in, the full Worker, the static site,
+        # and the paste-into-the-dashboard AI worker — the last one so local mode
+        # is tested both without AI and with it.
+        run: |
+          node dev/stub-groq.js 8799 > /tmp/stub.log 2>&1 &
+          npx wrangler dev --port 8787 --ip 127.0.0.1 --local > /tmp/worker.log 2>&1 &
+          GROQ_API_KEY=stub GROQ_BASE_URL=http://127.0.0.1:8799/openai/v1 \
+            node dev/ai-worker-server.mjs 8790 > /tmp/ai.log 2>&1 &
+          (cd ../web && python3 -m http.server 8788 --bind 127.0.0.1 > /tmp/web.log 2>&1 &)
+
+      - name: Wait for it to come up
+        run: |
+          for i in $(seq 1 40); do
+            if curl -sf http://127.0.0.1:8787/health > /dev/null \
+               && curl -sf http://127.0.0.1:8788/index.html > /dev/null \
+               && curl -sf http://127.0.0.1:8790/health > /dev/null; then
+              echo "stack is up"; curl -s http://127.0.0.1:8787/health; exit 0
+            fi
+            sleep 3
+          done
+          echo "::error::the stack did not come up"; tail -50 /tmp/worker.log; exit 1
+
+      - name: Run the journeys
+        working-directory: worker
+        run: node e2e/run-all.mjs
+
+      - name: Logs on failure
+        if: failure()
+        run: |
+          echo '--- worker ---';    tail -80 /tmp/worker.log
+          echo '--- ai worker ---'; tail -30 /tmp/ai.log
+          echo '--- stub ---';      tail -30 /tmp/stub.log
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: worker/e2e/screenshots/
+          if-no-files-found: ignore

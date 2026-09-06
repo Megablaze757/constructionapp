@@ -111,11 +111,15 @@ export function sendBlockers(quote, lines, totals) {
 
   const unconfirmed = lines.filter((l) => !l.confirmed);
   if (unconfirmed.length) {
+    // With no AI connected the same gate holds template defaults, which nothing
+    // estimated. Calling those "AI-drafted" would misdescribe what is on screen.
+    const drafted = unconfirmed.some((l) => l.source === 'ai_inferred' || l.source === 'photo_inferred')
+      ? 'AI-drafted' : 'drafted';
     blockers.push({
       code: 'unconfirmed_ai_lines',
       message: unconfirmed.length === 1
-        ? '1 AI-drafted item still needs confirming.'
-        : `${unconfirmed.length} AI-drafted items still need confirming.`,
+        ? `1 ${drafted} item still needs confirming.`
+        : `${unconfirmed.length} ${drafted} items still need confirming.`,
       lines: unconfirmed.map((l) => l.id),
     });
   }

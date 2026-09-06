@@ -55,16 +55,29 @@
 <dialog id="settings-dialog">
   <form method="dialog" class="card-body">
     <h2>Connection</h2>
-    <p class="muted" style="margin:0">
-      The Quote Builder talks to your Cloudflare Worker. The owner token is the
-      <code>OWNER_TOKEN</code> secret you set on it, and is stored only in this browser.
-    </p>
+    <p class="muted" style="margin:0" id="mode-explainer"></p>
+
     <label>API base URL
       <input type="text" id="api-base-display" readonly>
     </label>
     <label>Owner token
       <input type="text" id="owner-token" placeholder="paste your OWNER_TOKEN" autocomplete="off">
     </label>
+
+    <h2 style="margin-top:4px">AI drafting</h2>
+    <p class="muted" style="margin:0">
+      An API key cannot live in a browser, so AI drafting needs something to sit behind.
+      Paste the URL of the small AI worker — <code>worker/paste/ai-worker.js</code>, pasted
+      into the Cloudflare dashboard. Leave it empty and drafts come from the job template
+      instead, with every line marked for checking.
+    </p>
+    <label>AI worker URL
+      <input type="text" id="ai-base" placeholder="https://builderos-ai.you.workers.dev" autocomplete="off">
+    </label>
+    <label>AI worker token <span class="muted">(only if you set AI_SHARED_TOKEN)</span>
+      <input type="text" id="ai-token" placeholder="optional" autocomplete="off">
+    </label>
+
     <div class="btn-row">
       <button class="btn" value="cancel" type="submit">Cancel</button>
       <button class="btn btn-primary" id="save-settings" value="save" type="submit">Save</button>

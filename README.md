@@ -18,31 +18,62 @@ business" in one screen, and an automation engine that chases what needs chasing
 ## Architecture
 
 ```
-web/      static PWA          → GitHub Pages    Quote Builder + client quote page
+web/      static PWA          → GitHub Pages    every screen, owner and client
 worker/   Cloudflare Worker   → Workers + D1    API, pricing, margin gate, secrets
-                              → OpenRouter      the AI draft assistant
+                              → Groq            the AI draft assistant
 ```
 
 The split is load-bearing: GitHub Pages serves static files only, so there is
 nowhere on the frontend to hide an API key. Every secret, every price, and every
 margin calculation lives in the Worker. The browser is never trusted with money.
 
+## It runs before you deploy anything
+
+Open the published site with no Worker behind it and it still works. The Worker's
+own source runs in the browser against SQLite compiled to WebAssembly, with the
+database in IndexedDB — the same router, the same SQL, the same send gates, so
+behaviour matches the deployed thing rather than approximating it.
+
+What local mode cannot do is leave the device: no client can open a quote link, no
+crew member can open their own page, nothing syncs. The app says so on every screen.
+Three steps, each independently useful:
+
+| You have | Quoting | AI drafting | Client & crew links |
+| --- | --- | --- | --- |
+| nothing deployed | on this device | from the job template, every line flagged | — |
+| the AI worker ([one paste](worker/paste/ai-worker.js)) | on this device | real estimates from Groq | — |
+| the full Worker + D1 | shared | real estimates from Groq | yes |
+
+Middle row first if you are in a hurry: paste `worker/paste/ai-worker.js` into the
+Cloudflare dashboard, add your Groq key as a secret, and put the URL into Settings
+on the site. No build, no CLI, no database. See
+[docs/deployment.md](docs/deployment.md).
+
 ## Quick start
 
 ```bash
 cd worker && npm install
 npm run db:local                       # create tables + starter templates
-npx wrangler dev                       # API on :8787
-node dev/stub-openrouter.js            # stands in for OpenRouter, no key needed
-cd ../web && python3 -m http.server 8788
+npm run dev                            # API on :8787
+npm run stub                           # stands in for Groq, no key needed  (:8799)
+npm run ai                             # the paste-in AI worker, on Node     (:8790)
+npm run web                            # the site                            (:8788)
 ```
 
-Open <http://127.0.0.1:8788>, set the owner token to `dev-owner-token` in Settings.
-Full setup, including real deployment, is in [docs/deployment.md](docs/deployment.md).
+Open <http://127.0.0.1:8788>, set the owner token to `dev-owner-token` in Settings —
+or open <http://127.0.0.1:8788/index.html?api=&local=1> to see it with no Worker at
+all. Full setup, including real deployment, is in
+[docs/deployment.md](docs/deployment.md).
 
 ```bash
-cd worker && npm test                  # pricing, margin gate, and AI contract guardrails
+npm test                               # 184 unit tests: pricing, margin gate, AI contract
+npm run e2e                            # four browser journeys against the running stack
+npm run build:generated                # rebuild the paste file and the browser copies
 ```
+
+`worker/paste/`, `web/assets/schema.sql` and `web/assets/js/worker/` are generated
+from `worker/src` — edit the source, run `npm run build:generated`, and commit both.
+CI fails on a diff.
 
 ## Docs
 
@@ -53,7 +84,7 @@ cd worker && npm test                  # pricing, margin gate, and AI contract g
 - **[Phase 2 — Visibility](docs/phase-2/README.md)** — owner dashboard, reliability, cash forecast
 - **[Phase 3 — Automation](docs/phase-3/README.md)** — WHEN/IF/THEN rules, outbox, messaging
 - **[Auto-quoting module](docs/auto-quoting/README.md)** — the built module ([wireframes & AI spec](docs/auto-quoting/ui-and-ai-spec.md), [output schema](docs/auto-quoting/schemas/draft-quote.schema.json), [build status](docs/auto-quoting/README.md#12-build-status))
-- **[Deployment](docs/deployment.md)** — Pages, Cloudflare, OpenRouter, and local dev
+- **[Deployment](docs/deployment.md)** — Pages, Cloudflare, Groq, and local dev
 
 ## Screens
 
@@ -80,7 +111,14 @@ quantities from the price book. An inferred quantity can't claim high confidence
 photo measurement can't be claimed when no photo was sent, an unreviewed line can't
 be sent, and a quote below the margin floor can't go out without a logged reason.
 Those are enforced in the API, not just the UI, so skipping the app doesn't skip the
-gate.
+gate — and they are enforced again on this side of a proxy, so trusting something
+with the API key is not the same as trusting it with the contract.
+
+With no AI connected at all, drafting falls back to the job template. Every line
+comes back marked `template_default` with a note saying the description was never
+read, which holds the send gate shut until the owner has been through the lot. A
+template default the owner has checked is a real quote; a template default dressed
+up as an estimate is a lie the client pays for.
 
 ## Core principles
 

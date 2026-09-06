@@ -3,8 +3,8 @@
  *
  * There are two schemas here, deliberately:
  *
- *   WIRE_SCHEMA      what we constrain the model to via OpenRouter structured
- *                    outputs. Provider strict mode is OpenAI-flavoured: no
+ *   WIRE_SCHEMA      what we constrain the model to via the provider's structured
+ *                    outputs. Strict mode is OpenAI-flavoured: no
  *                    if/then/allOf, every property must appear in `required`,
  *                    and "optional" has to be expressed as a nullable union.
  *
@@ -41,7 +41,8 @@ export const AI_SOURCES = [
 /** Sources that are the model's own estimate rather than something it was told. */
 export const INFERRED_SOURCES = ['ai_inferred', 'photo_inferred'];
 
-/** Sent to OpenRouter as response_format.json_schema.schema (strict: true). */
+/** Sent as response_format.json_schema.schema (strict: true), or described in
+ *  the prompt when the model only serves plain JSON mode. */
 export const WIRE_SCHEMA = {
   type: 'object',
   additionalProperties: false,

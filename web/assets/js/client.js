@@ -5,7 +5,9 @@
  * renders what the API chooses to send. It never sees cost or margin.
  */
 
-import { clientApi, API_BASE, BUSINESS_NAME, price, titleCase, formatDate, esc, ApiError } from './api.js';
+import {
+  clientApi, clientPhotoUrl, BUSINESS_NAME, price, titleCase, formatDate, esc, ApiError,
+} from './api.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -82,10 +84,17 @@ function renderPhotos() {
   }
   host.hidden = false;
   host.innerHTML = photos
-    .map((p) => `<img src="${API_BASE}/q/${encodeURIComponent(token)}/photo/${encodeURIComponent(p.id)}"
-                      alt="${esc(p.caption || 'Site photo')}" loading="lazy">`)
+    .map((p) => `<img data-photo="${esc(p.id)}" alt="${esc(p.caption || 'Site photo')}" loading="lazy">`)
     .join('');
   host.classList.toggle('photo-multi', photos.length > 1);
+
+  // Resolved rather than templated, because in local mode the bytes come from
+  // this browser as a blob and there is no address to point the tag at.
+  host.querySelectorAll('img[data-photo]').forEach(async (img) => {
+    const src = await clientPhotoUrl(token, img.dataset.photo);
+    if (src) img.src = src;
+    else img.remove();
+  });
 }
 
 function renderExtras() {

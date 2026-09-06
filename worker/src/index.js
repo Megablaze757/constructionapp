@@ -9,7 +9,8 @@
 
 import { json, fail, requireOwner, corsHeaders, newId, randomToken } from './http.js';
 import { priceLine, totalQuote, sendBlockers, money } from './pricing.js';
-import { requestDraft } from './openrouter.js';
+import { requestDraft, aiConfigured } from './groq.js';
+import { templateDraft } from './fallback-draft.js';
 import {
   jobVariance, byJobType, lineCodeBias, biasBriefing, summarise,
 } from './variance.js';
@@ -67,7 +68,14 @@ export default {
     try {
       if (path === '/' || path === '/health') {
         return json(
-          { service: 'builderos-auto-quoting', ok: true, ai: !!env.OPENROUTER_API_KEY },
+          {
+            service: 'builderos-auto-quoting',
+            ok: true,
+            ai: aiConfigured(env),
+            // Which of the three ways of reaching a model is in play, so a
+            // misconfigured deployment is diagnosable without reading logs.
+            ai_mode: env.AI_PROXY_URL ? 'proxy' : env.GROQ_API_KEY ? 'groq' : 'template',
+          },
           ctxo,
         );
       }
@@ -392,7 +400,7 @@ async function draftQuote(row, request, env, ctxo) {
   // its jobs actually cost, fed back in as scoping guidance.
   const estimatingHistory = biasBriefing(lineCodeBias(quotedLines, actualCosts));
 
-  const result = await requestDraft(env, {
+  let result = await requestDraft(env, {
     description,
     template,
     priceBook: book,
@@ -400,7 +408,18 @@ async function draftQuote(row, request, env, ctxo) {
     estimatingHistory,
     photos,
   });
-  if (!result.ok) {
+
+  // No AI connected yet is not an error the owner can act on. Start them from
+  // the template instead, labelled as such — see fallback-draft.js.
+  if (!result.ok && result.unconfigured) {
+    const fallback = templateDraft(template);
+    if (!fallback.ok) return fail(502, fallback.error, {}, ctxo);
+    result = {
+      ok: true, ai: false, draft: fallback.draft, model: 'template defaults (no AI connected)',
+      mode: 'template', photos_used: 0,
+    };
+    await db.logEvent(D1, row.id, 'template_drafted', { lines: fallback.draft.line_items.length });
+  } else if (!result.ok) {
     await db.logEvent(D1, row.id, 'ai_draft_failed', { error: result.error });
     return fail(502, result.error, { detail: result.detail }, ctxo);
   }
@@ -443,12 +462,16 @@ async function draftQuote(row, request, env, ctxo) {
     estimating_history: estimatingHistory,
     photos_used: result.photos_used,
     model: result.model,
+    // The builder reads this to decide whether to call the result an estimate.
+    ai: result.ai !== false,
     drafted_at: new Date().toISOString(),
   };
   await D1.prepare('UPDATE quotes SET description = ?2, ai_summary = ?3 WHERE id = ?1')
     .bind(row.id, description, JSON.stringify(summary))
     .run();
-  await db.logEvent(D1, row.id, 'ai_drafted', { model: result.model, lines: drafted.length });
+  if (result.ai !== false) {
+    await db.logEvent(D1, row.id, 'ai_drafted', { model: result.model, lines: drafted.length });
+  }
 
   const loaded = await db.loadQuote(D1, await db.getQuoteRow(D1, row.id));
   await db.saveTotals(D1, row.id, loaded.totals);

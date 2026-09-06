@@ -223,7 +223,7 @@ merely instructed.
 
 **Two schemas, one contract**
 
-Provider strict mode (OpenRouter/OpenAI-flavoured structured outputs) is a subset of JSON Schema:
+Provider strict mode (Groq/OpenAI-flavoured structured outputs) is a subset of JSON Schema:
 no `if`/`then`/`allOf`, every property must appear in `required`, and "optional" has to be
 expressed as a nullable union. The interesting guardrails here — *an inferred quantity is never
 high confidence*, *anything below high confidence must carry a note* — are exactly the conditional

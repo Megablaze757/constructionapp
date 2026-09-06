@@ -3,3 +3,6 @@ node_modules/
 worker/.dev.vars
 .DS_Store
 *.log
+
+# e2e artefacts, regenerated on every run
+worker/e2e/screenshots/

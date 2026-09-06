@@ -1,5 +1,5 @@
 import './pwa.js';
-import { api, ownerToken, API_BASE, formatDate, esc, ApiError } from './api.js';
+import { api, ready, formatDate, esc, ApiError } from './api.js';
 
 const $ = (id) => document.getElementById(id);
 let catalogue = { triggers: [], actions: [] };
@@ -15,7 +15,7 @@ function reportError(err) {
 }
 
 async function boot() {
-  if (!API_BASE || !ownerToken.get()) {
+  if (!await ready()) {
     return banner('bad', 'Not configured. Set your owner token on the <a href="index.html">quotes screen</a>.');
   }
   await Promise.all([loadRules(), loadOutbox()]);

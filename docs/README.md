@@ -6,12 +6,18 @@ for construction owners.
 The **auto-quoting module and roadmap Phases 0–3 are built and runnable** — see
 [deployment](deployment.md). Phases 4–7 of the system spec are still design intent.
 
+It runs before anything is deployed: with no Worker configured, the browser runs the
+Worker's own source against SQLite in WebAssembly, on that device only. Adding the
+one-file [AI worker](../worker/paste/ai-worker.js) turns on real drafting; adding the
+full Worker turns on sharing, client links and crew links. Each step stands alone —
+[deployment §0–2](deployment.md#0-pages-on-its-own-no-worker).
+
 ## Map
 
 ```
 docs/
 ├── builderos-system-spec.md          ← whole-system vision, features, 12-month roadmap
-├── deployment.md                     ← GitHub Pages + Cloudflare + OpenRouter setup
+├── deployment.md                     ← GitHub Pages + Cloudflare + Groq setup
 ├── phase-0/README.md                 ← jobs, team, SOPs, invoicing (built)
 ├── phase-1/README.md                 ← tasks, crew links, site log, check-ins (built)
 ├── phase-2/README.md                 ← owner dashboard, reliability, forecast (built)
@@ -25,7 +31,9 @@ docs/
 web/       static PWA → GitHub Pages
            dashboard · quotes · builder · client quote · jobs · variance
            team · sops · cash · automations · crew (field-facing)
-worker/    Cloudflare Worker + D1 → the API, pricing, variance, and OpenRouter call
+           assets/js/local/  ← runs worker/src in the browser when no Worker is set
+worker/    Cloudflare Worker + D1 → the API, pricing, variance, and Groq call
+           paste/ai-worker.js ← one file, one paste, AI drafting with no CLI
 ```
 
 ## Documents
@@ -40,7 +48,7 @@ worker/    Cloudflare Worker + D1 → the API, pricing, variance, and OpenRouter
 | [Phase 1 — Delegation](phase-1/README.md) | Task assignment with photo proof and escalation, crew access links, role-based SOPs, daily site log, client check-ins | Module |
 | [Phase 2 — Visibility](phase-2/README.md) | Owner dashboard, at-risk jobs, cash forecast, live margin, reliability scoring and what it refuses to guess | Module |
 | [Phase 3 — Automation](phase-3/README.md) | WHEN/IF/THEN engine, deduplication, pre-built templates, the outbox, and why nothing is ever claimed as sent | Module |
-| [Deployment](deployment.md) | Deploying the Worker, the Pages site, and wiring them together; local development without an API key | Ops |
+| [Deployment](deployment.md) | The three steps — Pages alone, the one-paste AI worker, the full Worker + D1 — plus model choice, CI, security notes and costs | Ops |
 
 ## Conventions
 

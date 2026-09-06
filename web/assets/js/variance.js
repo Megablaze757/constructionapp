@@ -1,5 +1,5 @@
 import './pwa.js';
-import { api, ownerToken, API_BASE, price, titleCase, formatDate, esc, ApiError } from './api.js';
+import { api, ready, price, titleCase, formatDate, esc, ApiError } from './api.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -12,7 +12,7 @@ const signed = (n) => `${n > 0 ? '+' : ''}${n}`;
 const signedPrice = (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${price(Math.abs(n))}`;
 
 async function boot() {
-  if (!API_BASE || !ownerToken.get()) {
+  if (!await ready()) {
     return banner('bad', 'Not configured. Set your owner token on the <a href="index.html">quotes screen</a>.');
   }
   try {
