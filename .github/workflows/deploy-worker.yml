@@ -29,7 +29,19 @@ jobs:
   deploy:
     needs: test          # never ship a Worker whose guardrail tests are failing
     runs-on: ubuntu-latest
+    # Deploying is optional: the app runs on Pages alone, and the Worker is the
+    # step you take when you want shared data and working client links. Without
+    # the Cloudflare secrets this skips and says so, rather than painting every
+    # push red for a step nobody has asked for yet.
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.DEPLOY_WORKER == 'true' }}
     steps:
+      - name: Check the secrets are there
+        run: |
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
+            echo "::error::DEPLOY_WORKER is on but CLOUDFLARE_API_TOKEN is not set."
+            echo "Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:

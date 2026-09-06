@@ -219,8 +219,13 @@ a different database.
 
 [`deploy-worker.yml`](../.github/workflows/deploy-worker.yml) runs the test suite
 and then deploys on any push touching `worker/`. It needs two repository
-**secrets**: `CLOUDFLARE_API_TOKEN` (with the *Edit Cloudflare Workers* template,
-plus D1 edit) and `CLOUDFLARE_ACCOUNT_ID`.
+**secrets** — `CLOUDFLARE_API_TOKEN` (with the *Edit Cloudflare Workers* template,
+plus D1 edit) and `CLOUDFLARE_ACCOUNT_ID` — and the repository **variable**
+`DEPLOY_WORKER` set to `true`.
+
+The variable is the switch: until you set it, the deploy step skips rather than
+failing, because the app runs on Pages alone and a red cross on every push would
+hide a real failure. You can also run it once by hand from the Actions tab.
 
 Deployment is gated on `npm test`, so a change that breaks a pricing or contract
 guardrail cannot reach production.
