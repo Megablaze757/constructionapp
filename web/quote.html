@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1a56db">
+<meta name="robots" content="noindex, nofollow">
+<title>Your quote</title>
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/app.css">
+<script src="config.js"></script>
+</head>
+<body>
+<div class="shell" id="shell">
+  <div class="client-head">
+    <div class="logo" id="logo">B</div>
+    <h1 id="heading">Loading your quote…</h1>
+    <p class="muted" id="validity"></p>
+  </div>
+
+  <div id="banner"></div>
+
+  <div id="content" hidden>
+    <div class="card">
+      <div class="card-body">
+        <!-- Shown only once a site photo exists. Photo upload is not built yet,
+             so this stays hidden rather than showing a client a placeholder
+             where their own property should be. -->
+        <div class="photo" id="photo" hidden>📸</div>
+        <h2 style="font-size:18px;text-transform:none;letter-spacing:0;color:var(--ink);padding:0" id="job-title"></h2>
+        <p class="muted" id="job-summary" style="margin:0"></p>
+        <ul class="muted" id="scope" style="margin:0;padding-left:18px"></ul>
+        <div class="total-row">
+          <span class="label">Base price</span>
+          <span class="value" id="base-price">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="extras-card">
+      <h2>Add to your quote</h2>
+      <div class="lines" id="extras"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div class="total-row">
+          <span class="label">Your total</span>
+          <span class="value" id="total">—</span>
+        </div>
+        <div id="accepted-note"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="actionbar" id="actions" hidden>
+  <div class="inner">
+    <button class="btn btn-accept" id="accept-btn" type="button">✅ Accept &amp; Book Job</button>
+    <button class="btn" id="ask-btn" type="button">Ask a question</button>
+  </div>
+</div>
+
+<dialog id="ask-dialog">
+  <form method="dialog" class="card-body">
+    <h2>Ask a question</h2>
+    <p class="muted" style="margin:0">This goes straight to your builder.</p>
+    <label class="sr-only" for="ask-message">Your question</label>
+    <textarea id="ask-message" placeholder="e.g. Could you start the week of the 12th?"></textarea>
+    <div class="btn-row">
+      <button class="btn" value="cancel" type="submit">Cancel</button>
+      <button class="btn btn-primary" value="send" type="submit">Send</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="confirm-dialog">
+  <form method="dialog" class="card-body">
+    <h2>Book this job?</h2>
+    <p class="muted" id="confirm-detail" style="margin:0"></p>
+    <div class="btn-row">
+      <button class="btn" value="cancel" type="submit">Not yet</button>
+      <button class="btn btn-accept" value="accept" type="submit">Yes, book it</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module" src="assets/js/client.js"></script>
+</body>
+</html>

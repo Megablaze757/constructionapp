@@ -1,0 +1,41 @@
+name = "builderos-quoting"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+# Secrets (set with `wrangler secret put`, never in this file):
+#   GROQ_API_KEY         your Groq key (console.groq.com/keys)
+#   OWNER_TOKEN          shared token the Quote Builder authenticates with
+[vars]
+# Comma-separated CORS allowlist. Replace with your GitHub Pages origin.
+ALLOWED_ORIGINS = "http://localhost:8788,http://127.0.0.1:8788"
+# Public base URL of the Pages site, used to build the client quote link.
+PUBLIC_APP_URL = "http://localhost:8788"
+# Text drafting. Any Groq chat model that can hold to JSON mode.
+GROQ_MODEL = "llama-3.3-70b-versatile"
+# Used only when site photos are attached — the text model above cannot see.
+GROQ_VISION_MODEL = "meta-llama/llama-4-maverick-17b-128e-instruct"
+# "auto" tries json_schema and falls back to json_object on models that do not
+# serve it. Force one with "json_schema" or "json_object" if you prefer.
+GROQ_STRUCTURED_OUTPUTS = "auto"
+# Name used in automated messages to clients.
+BUSINESS_NAME = "Builder Co."
+# "simulated" (default) records what would be sent without sending it.
+# "webhook" POSTs each message to MESSAGING_WEBHOOK_URL so you can wire any
+# provider (Twilio, WhatsApp Business, Zapier, Make) without changing code.
+MESSAGING_DRIVER = "simulated"
+# MESSAGING_WEBHOOK_URL = "https://your-endpoint.example/messages"
+# MESSAGING_WEBHOOK_SECRET is a secret — set it with `wrangler secret put`.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "builderos-quoting"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+# Runs the automation engine hourly. The engine is a pure function of state and
+# deduplicates every firing, so running it often is safe — a "14 days overdue"
+# rule chases once, not once an hour.
+[triggers]
+crons = ["0 * * * *"]
+
+[observability]
+enabled = true

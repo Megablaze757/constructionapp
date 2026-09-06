@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1a56db">
+<title>Jobs — BuilderOS</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/app.css">
+<script src="config.js"></script>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <a class="back" href="index.html" aria-label="Back to quotes">←</a>
+    <h1>Jobs</h1>
+    <button class="btn btn-sm btn-primary" id="new-job-btn" type="button">+ Job</button>
+  </div>
+
+  <div id="banner"></div>
+
+  <!-- Job list -->
+  <div id="list-view">
+    <div class="card">
+      <div class="card-body">
+        <div class="btn-row">
+          <a class="btn btn-sm" href="dashboard.html">Dashboard</a>
+    <a class="btn btn-sm" href="team.html">Team</a>
+          <a class="btn btn-sm" href="sops.html">SOPs</a>
+          <a class="btn btn-sm" href="cash.html">Cash</a>
+          <a class="btn btn-sm" href="variance.html">Variance</a>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Every job</h2>
+      <div class="lines" id="job-list"><div class="card-body muted">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- Job detail -->
+  <div id="detail-view" hidden>
+    <div class="card">
+      <div class="card-body">
+        <h2 style="font-size:18px;text-transform:none;letter-spacing:0;color:var(--ink);padding:0" id="job-title"></h2>
+        <p class="muted" id="job-meta" style="margin:0"></p>
+        <label>Status
+          <select id="job-status">
+            <option value="booked">Booked</option>
+            <option value="in_progress">In progress</option>
+            <option value="on_hold">On hold</option>
+            <option value="complete">Complete</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Tasks <span id="task-badge" class="badge badge-ok">—</span></h2>
+      <div class="lines" id="task-list"></div>
+      <div class="card-body">
+        <button class="btn" id="add-task-btn" type="button">+ Assign a task</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Site log</h2>
+      <div class="lines" id="log-list"></div>
+      <div class="card-body">
+        <button class="btn" id="add-log-btn" type="button">+ Add an entry</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Client check-ins</h2>
+      <div class="lines" id="checkin-list"></div>
+      <div class="card-body">
+        <button class="btn" id="schedule-checkins-btn" type="button">Schedule check-ins</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Who's on it</h2>
+      <div class="lines" id="crew-list"></div>
+      <div class="card-body">
+        <div class="btn-row">
+          <select id="crew-picker"></select>
+          <button class="btn btn-sm btn-primary" id="assign-btn" type="button">Assign</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Checklists</h2>
+      <div id="sop-list"></div>
+      <div class="card-body">
+        <div class="btn-row">
+          <select id="sop-picker"></select>
+          <button class="btn btn-sm btn-primary" id="attach-sop-btn" type="button">Attach</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Quoted vs actual</h2>
+      <div class="card-body" id="job-variance"></div>
+    </div>
+
+    <div class="card">
+      <h2>Costs booked</h2>
+      <div class="lines" id="cost-list"></div>
+      <div class="card-body">
+        <button class="btn" id="add-cost-btn" type="button">+ Log a cost</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<dialog id="cost-dialog">
+  <form method="dialog" class="card-body">
+    <h2>Log a cost</h2>
+    <label>Against which quoted line?
+      <select id="cost-line"></select>
+    </label>
+    <label>Description
+      <input type="text" id="cost-desc" placeholder="e.g. Erect labour, 2 days" autocomplete="off">
+    </label>
+    <label>Amount (£, actual cost to you)
+      <input type="number" id="cost-amount" min="0" step="0.01" inputmode="decimal">
+    </label>
+    <label>Category
+      <select id="cost-category">
+        <option value="labour">Labour</option>
+        <option value="material">Material</option>
+        <option value="plant">Plant</option>
+        <option value="other">Other</option>
+      </select>
+    </label>
+    <label>Date
+      <input type="text" id="cost-date" placeholder="YYYY-MM-DD (blank = today)" autocomplete="off">
+    </label>
+    <div class="btn-row">
+      <button class="btn" value="cancel" type="submit">Cancel</button>
+      <button class="btn btn-primary" value="save" type="submit">Log cost</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="new-job-dialog">
+  <form method="dialog" class="card-body">
+    <h2>New job</h2>
+    <p class="muted" style="margin:0">For work that didn't come through a quote here.</p>
+    <label>Client
+      <input type="text" id="nj-client" autocomplete="off">
+    </label>
+    <label>Job type
+      <input type="text" id="nj-type" placeholder="e.g. domestic_scaffold_erect" autocomplete="off">
+    </label>
+    <label>Site
+      <input type="text" id="nj-site" autocomplete="off">
+    </label>
+    <label>Client phone <span class="muted">(so automations can reach them)</span>
+      <input type="text" id="nj-phone" autocomplete="off" inputmode="tel">
+    </label>
+    <label>Start / end target
+      <div class="btn-row">
+        <input type="text" id="nj-start" placeholder="YYYY-MM-DD" autocomplete="off">
+        <input type="text" id="nj-end" placeholder="YYYY-MM-DD" autocomplete="off">
+      </div>
+    </label>
+    <label>Agreed price (£)
+      <input type="number" id="nj-price" min="0" step="0.01" inputmode="decimal">
+    </label>
+    <label>Expected cost (£)
+      <input type="number" id="nj-cost" min="0" step="0.01" inputmode="decimal">
+    </label>
+    <div class="btn-row">
+      <button class="btn" value="cancel" type="submit">Cancel</button>
+      <button class="btn btn-primary" value="save" type="submit">Create job</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="task-dialog">
+  <form method="dialog" class="card-body">
+    <h2>Assign a task</h2>
+    <label>What needs doing?
+      <input type="text" id="t-title" autocomplete="off">
+    </label>
+    <label>Who owns it?
+      <select id="t-person"></select>
+    </label>
+    <label>Due
+      <input type="text" id="t-due" placeholder="YYYY-MM-DD" autocomplete="off">
+    </label>
+    <label>Escalate to me after (days past due)
+      <input type="number" id="t-grace" min="0" step="1" value="2" inputmode="numeric">
+    </label>
+    <label class="inline-check">
+      <input type="checkbox" id="t-photo">
+      <span>Needs a photo as proof</span>
+    </label>
+    <div class="btn-row">
+      <button class="btn" value="cancel" type="submit">Cancel</button>
+      <button class="btn btn-primary" value="save" type="submit">Assign</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="log-dialog">
+  <form method="dialog" class="card-body">
+    <h2>Site log entry</h2>
+    <label>What happened?
+      <textarea id="l-body" rows="4"></textarea>
+    </label>
+    <label>Type
+      <select id="l-kind">
+        <option value="progress">Progress</option>
+        <option value="issue">Problem</option>
+        <option value="delay">Delay</option>
+        <option value="delivery">Delivery</option>
+        <option value="safety">Safety</option>
+      </select>
+    </label>
+    <div class="btn-row">
+      <button class="btn" value="cancel" type="submit">Cancel</button>
+      <button class="btn btn-primary" value="save" type="submit">Add</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module" src="assets/js/jobs.js"></script>
+</body>
+</html>

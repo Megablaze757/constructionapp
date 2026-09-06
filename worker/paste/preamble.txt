@@ -1,0 +1,34 @@
+/**
+ * BuilderOS — AI drafting worker.
+ *
+ * Paste this whole file into the Cloudflare dashboard and the AI half of
+ * BuilderOS works. No build step, no D1, no wrangler, no repository.
+ *
+ * ── Deploy ──────────────────────────────────────────────────────────────────
+ *   1. dash.cloudflare.com → Workers & Pages → Create → Start with Hello World
+ *   2. Deploy it, then Edit code, select all, and paste this file over the top.
+ *      Deploy again.
+ *   3. Settings → Variables and Secrets:
+ *        GROQ_API_KEY     (Secret)   from console.groq.com/keys
+ *        ALLOWED_ORIGINS  (Variable) https://<you>.github.io
+ *      Optional:
+ *        AI_SHARED_TOKEN  (Secret)   callers must send it as a Bearer token
+ *        GROQ_MODEL       (Variable) default llama-3.3-70b-versatile
+ *        GROQ_VISION_MODEL(Variable) default meta-llama/llama-4-maverick-17b-128e-instruct
+ *   4. Open https://<your-worker>.workers.dev/health — it should say ai: true.
+ *   5. Put that URL in web/config.js as `aiBase`, or paste it into Settings on
+ *      the site itself.
+ *
+ * ── What it does ────────────────────────────────────────────────────────────
+ *   GET  /health   { ok, ai, model, vision_model }
+ *   POST /draft    { description, template, price_book, similar_jobs,
+ *                    estimating_history, photos: [{mime, b64}] }
+ *              →   { ok: true, draft, model, mode, photos_used }
+ *
+ * The model returns quantities and provenance. It is never given a price field
+ * to fill in, cannot name a line the template does not offer, cannot claim high
+ * confidence on something it inferred, and cannot claim to have read a photo
+ * that was not sent. Those rules are enforced in validateDraft() below, after
+ * the model has answered — not asked for in the prompt and hoped for.
+ */
+

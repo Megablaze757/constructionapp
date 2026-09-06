@@ -1,0 +1,59 @@
+name: Deploy web to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+# Allow one concurrent deployment, letting an in-progress run finish so a
+# half-published site is never left live.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # The site is plain ES modules — nothing to build, so the artifact is the
+      # directory as committed. Any bundler here would only add ways to break.
+      # Both are optional. With neither set the published site runs the Worker's
+      # own source in the browser and drafts from the job template — usable on
+      # day one, on one device, which the site says on every screen.
+      - name: Point the frontend at whatever has been deployed
+        env:
+          API_BASE: ${{ vars.API_BASE }}
+          AI_BASE: ${{ vars.AI_BASE }}
+          BUSINESS_NAME: ${{ vars.BUSINESS_NAME }}
+        run: |
+          {
+            echo "window.BUILDEROS_CONFIG = {"
+            echo "  apiBase: '${API_BASE}',"
+            echo "  aiBase: '${AI_BASE}',"
+            echo "  businessName: '${BUSINESS_NAME:-Builder Co.}',"
+            echo "};"
+          } > web/config.js
+          if [ -z "$API_BASE" ] && [ -z "$AI_BASE" ]; then
+            echo "::notice::Neither API_BASE nor AI_BASE is set — the site will run in local mode."
+          fi
+          cat web/config.js
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4

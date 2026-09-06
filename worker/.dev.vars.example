@@ -1,0 +1,12 @@
+# Copy to .dev.vars for local development. That file is git-ignored.
+#
+# OWNER_TOKEN is whatever you like locally; it is what the app authenticates
+# with. GROQ_BASE_URL points at the local stub so you can develop without
+# spending tokens — delete that line and put a real key in GROQ_API_KEY to use
+# Groq for real.
+OWNER_TOKEN=dev-owner-token
+GROQ_API_KEY=stub-key-for-local-dev
+GROQ_BASE_URL=http://127.0.0.1:8799/v1
+ALLOWED_ORIGINS=http://127.0.0.1:8788
+PUBLIC_APP_URL=http://127.0.0.1:8788
+BUSINESS_NAME=Builder Co.
