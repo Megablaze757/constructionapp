@@ -51,7 +51,13 @@ jobs:
           fi
           cat web/config.js
 
+      # `enablement` turns Pages on via the API when it has not been switched on
+      # by hand. If it still fails, the repository has Pages disabled or set to a
+      # branch source: Settings → Pages → Build and deployment → Source: GitHub
+      # Actions. That is the one setting no workflow can do for you.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web
