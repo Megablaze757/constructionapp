@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1a56db">
+<title>Dashboard — BuilderOS</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/app.css">
+<script src="config.js"></script>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <h1>Dashboard</h1>
+    <button class="btn btn-sm" id="refresh-btn" type="button">Refresh</button>
+  </div>
+
+  <div id="banner"></div>
+
+  <!-- The four numbers -->
+  <div class="card">
+    <div class="card-body">
+      <div class="tiles" id="tiles"><span class="muted">Loading…</span></div>
+    </div>
+  </div>
+
+  <!-- Needs your decision -->
+  <div class="card" id="decisions-card" hidden>
+    <h2>Needs your decision</h2>
+    <div class="lines" id="decisions"></div>
+  </div>
+
+  <!-- At-risk jobs -->
+  <div class="card" id="risk-card" hidden>
+    <h2>At-risk jobs</h2>
+    <div class="lines" id="risks"></div>
+  </div>
+
+  <!-- Job status overview -->
+  <div class="card">
+    <h2>Jobs running</h2>
+    <div class="lines" id="jobs"></div>
+  </div>
+
+  <!-- Cash -->
+  <div class="card">
+    <h2>Cash <a class="btn btn-sm" href="cash.html">Details →</a></h2>
+    <div class="card-body" id="cash"></div>
+  </div>
+
+  <!-- Margin -->
+  <div class="card">
+    <h2>Margin on live work <a class="btn btn-sm" href="variance.html">Variance →</a></h2>
+    <div class="card-body" id="margin"></div>
+  </div>
+
+  <!-- Reliability -->
+  <div class="card">
+    <h2>Reliability <a class="btn btn-sm" href="team.html">Team →</a></h2>
+    <div class="card-body" id="reliability"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <div class="btn-row">
+        <a class="btn btn-sm" href="index.html">Quotes</a>
+        <a class="btn btn-sm" href="jobs.html">Jobs</a>
+        <a class="btn btn-sm" href="sops.html">SOPs</a>
+        <a class="btn btn-sm" href="automations.html">Automations</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="assets/js/dashboard.js"></script>
+</body>
+</html>

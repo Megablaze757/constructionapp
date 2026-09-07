@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1a56db">
+<title>Quote Builder — BuilderOS</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/app.css">
+<script src="config.js"></script>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <a class="back" href="index.html" aria-label="Back to quotes">←</a>
+    <h1 id="title">Quote</h1>
+    <button class="btn btn-sm" id="save-btn" type="button">Save Draft</button>
+  </div>
+
+  <div id="banner"></div>
+
+  <!-- Client / job type / site -->
+  <div class="card">
+    <div class="card-body">
+      <label>Client
+        <input type="text" id="client_name" autocomplete="off">
+      </label>
+      <label>Job type
+        <input type="text" id="job_type_display" readonly>
+      </label>
+      <label>Site
+        <input type="text" id="site_address" autocomplete="off">
+      </label>
+    </div>
+  </div>
+
+  <!-- Voice / typed description → AI draft -->
+  <div class="card">
+    <h2>🎙️ Describe the job</h2>
+    <div class="card-body">
+      <button class="btn btn-record" id="record-btn" type="button">● Hold to record voice note</button>
+      <p class="muted" id="record-hint" style="margin:0">or type the description below</p>
+      <label class="sr-only" for="description">Job description</label>
+      <textarea id="description" placeholder="Rear scaffold, 2 lifts, roofer access, up 5 days"></textarea>
+      <p class="muted" style="margin:0">Your own notes and the AI's input. The client never sees this.</p>
+      <label class="inline-check" id="use-photos-row" hidden>
+        <input type="checkbox" id="use-photos" checked>
+        <span>Let the AI look at your site photos <span class="muted" id="photo-count"></span></span>
+      </label>
+      <button class="btn btn-primary" id="draft-btn" type="button">Generate Draft with AI</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>What the client sees</h2>
+    <div class="card-body">
+      <label class="sr-only" for="client_summary">Client-facing summary</label>
+      <textarea id="client_summary" placeholder="Rear scaffold — 2 lifts. Includes erect, 5-day hire, dismantle, and roofer access."></textarea>
+      <p class="muted" style="margin:0">Plain language for the quote page. Leave blank to show just the scope list.</p>
+    </div>
+  </div>
+
+  <!-- Site photos -->
+  <div class="card">
+    <h2>Site photos <span class="muted" style="text-transform:none;letter-spacing:0">shown on the client quote</span></h2>
+    <div class="card-body">
+      <div id="photo-grid"></div>
+      <label class="sr-only" for="photo-input">Add site photos</label>
+      <input type="file" id="photo-input" accept="image/*" multiple capture="environment" hidden>
+      <button class="btn" id="photo-btn" type="button">📷 Add site photo</button>
+      <p class="muted" style="margin:0">Resized in your browser before upload, so it works on a weak site signal.</p>
+    </div>
+  </div>
+
+  <!-- AI assumptions and flags -->
+  <div class="card" id="ai-summary" hidden>
+    <h2>AI draft notes</h2>
+    <div class="card-body" id="ai-summary-body"></div>
+  </div>
+
+  <!-- Line items -->
+  <div class="card">
+    <h2>Line items <span id="margin-badge" class="badge badge-ok">—</span></h2>
+    <div class="lines" id="lines"></div>
+    <div class="card-body">
+      <button class="btn" id="add-line-btn" type="button">+ Add line item</button>
+    </div>
+  </div>
+
+  <!-- Optional extras -->
+  <div class="card">
+    <h2>Optional extras <span class="muted" style="text-transform:none;letter-spacing:0">client can toggle</span></h2>
+    <div class="lines" id="extras"></div>
+  </div>
+
+  <!-- Totals -->
+  <div class="card">
+    <div class="card-body">
+      <div class="total-row">
+        <span class="label">Total (excl. extras)</span>
+        <span class="value" id="total">—</span>
+      </div>
+      <div class="total-row">
+        <span class="label">Margin</span>
+        <span id="margin-line"></span>
+      </div>
+      <div id="blockers"></div>
+    </div>
+  </div>
+</div>
+
+<div class="actionbar">
+  <div class="inner">
+    <button class="btn" id="preview-btn" type="button">Preview as Client</button>
+    <button class="btn btn-primary" id="send-btn" type="button">Send Quote →</button>
+  </div>
+</div>
+
+<!-- Edit a line item -->
+<dialog id="line-dialog">
+  <form method="dialog" class="card-body">
+    <h2 id="line-dialog-title">Edit line item</h2>
+    <label>Item
+      <select id="line-code"></select>
+    </label>
+    <label>Description
+      <input type="text" id="line-desc" autocomplete="off">
+    </label>
+    <label>Quantity <span class="muted" id="line-unit"></span>
+      <input type="number" id="line-qty" min="0" step="any" inputmode="decimal">
+    </label>
+    <p class="muted" id="line-price-preview" style="margin:0"></p>
+    <div class="btn-row">
+      <button class="btn" value="cancel" type="submit">Cancel</button>
+      <button class="btn btn-primary" value="save" type="submit">Save</button>
+    </div>
+    <button class="btn btn-danger" id="line-delete" value="delete" type="submit">Remove item</button>
+  </form>
+</dialog>
+
+<!-- Margin floor override -->
+<dialog id="override-dialog">
+  <form method="dialog" class="card-body">
+    <h2>Below the margin floor</h2>
+    <p class="muted" id="override-detail" style="margin:0"></p>
+    <label>Reason for sending anyway
+      <textarea id="override-reason" placeholder="e.g. Repeat client, expect two follow-on jobs"></textarea>
+    </label>
+    <p class="muted" style="margin:0">This reason is recorded against the quote.</p>
+    <div class="btn-row">
+      <button class="btn" value="cancel" type="submit">Cancel</button>
+      <button class="btn btn-primary" value="override" type="submit">Log &amp; send</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Sent -->
+<dialog id="sent-dialog">
+  <form method="dialog" class="card-body">
+    <h2>Quote sent</h2>
+    <p class="muted" style="margin:0">Share this link with the client:</p>
+    <input type="text" id="sent-link" readonly>
+    <div class="btn-row">
+      <button class="btn" id="copy-link" type="button">Copy link</button>
+      <a class="btn btn-primary" id="open-link" target="_blank" rel="noopener">Open</a>
+    </div>
+    <button class="btn" value="close" type="submit">Done</button>
+  </form>
+</dialog>
+
+<script type="module" src="assets/js/builder.js"></script>
+</body>
+</html>

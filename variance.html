@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1a56db">
+<title>Quote vs actual — BuilderOS</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/app.css">
+<script src="config.js"></script>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <a class="back" href="jobs.html" aria-label="Back to jobs">←</a>
+    <h1>Quote vs actual</h1>
+  </div>
+
+  <div id="banner"></div>
+
+  <div class="card">
+    <h2>Across completed jobs</h2>
+    <div class="card-body" id="summary"><span class="muted">Loading…</span></div>
+  </div>
+
+  <div class="card">
+    <h2>Where estimates drift <span class="muted" style="text-transform:none;letter-spacing:0">by line</span></h2>
+    <div class="card-body" id="bias"></div>
+  </div>
+
+  <div class="card">
+    <h2>By job type</h2>
+    <div class="lines" id="by-type"></div>
+  </div>
+
+  <div class="card">
+    <h2>Every completed job</h2>
+    <div class="lines" id="jobs"></div>
+  </div>
+</div>
+
+<script type="module" src="assets/js/variance.js"></script>
+</body>
+</html>

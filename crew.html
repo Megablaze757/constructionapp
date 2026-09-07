@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1a56db">
+<meta name="robots" content="noindex, nofollow">
+<title>My jobs</title>
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/app.css">
+<script src="config.js"></script>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <h1 id="who">Loading…</h1>
+  </div>
+
+  <div id="banner"></div>
+
+  <div class="card" id="tasks-card" hidden>
+    <h2>My tasks</h2>
+    <div class="lines" id="tasks"></div>
+  </div>
+
+  <div id="jobs"></div>
+</div>
+
+<!-- Log what happened on site -->
+<dialog id="log-dialog">
+  <form method="dialog" class="card-body">
+    <h2 id="log-title">Log an update</h2>
+    <label>What happened?
+      <textarea id="log-body" rows="4" placeholder="e.g. Second lift up, roofers on tomorrow"></textarea>
+    </label>
+    <label>Type
+      <select id="log-kind">
+        <option value="progress">Progress</option>
+        <option value="issue">Problem</option>
+        <option value="delay">Delay</option>
+        <option value="delivery">Delivery</option>
+        <option value="safety">Safety</option>
+      </select>
+    </label>
+    <button class="btn" id="log-photo-btn" type="button">📷 Add a photo</button>
+    <p class="muted" id="log-photo-status" style="margin:0"></p>
+    <div class="btn-row">
+      <button class="btn" value="cancel" type="submit">Cancel</button>
+      <button class="btn btn-primary" value="save" type="submit">Send</button>
+    </div>
+  </form>
+</dialog>
+
+<input type="file" id="photo-input" accept="image/*" capture="environment" hidden>
+
+<script type="module" src="assets/js/crew.js"></script>
+</body>
+</html>
