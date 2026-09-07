@@ -41,7 +41,7 @@ export default async function run() {
   step('Drafting falls back to the template, and says so');
   await page.fill('#description', 'Rear scaffold for the roofers, five days or so.');
   await page.click('#draft-btn');
-  await page.waitForSelector('.line', { timeout: 30000 });
+  await page.waitForSelector('#ai-summary:not([hidden])', { timeout: 30000 });
 
   const tags = await page.locator('.line .tag-ai').allTextContents();
   check(tags.length === 0, 'nothing is labelled as an AI estimate',

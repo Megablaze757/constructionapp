@@ -11,9 +11,9 @@
 
 const cfg = window.BUILDEROS_CONFIG || {};
 const params = new URLSearchParams(location.search);
-const override = params.get('api');
+const override = params.has('api') ? params.get('api') : cfg.apiBase;
 
-export const API_BASE = (override || cfg.apiBase || '').replace(/\/$/, '');
+export const API_BASE = (override || '').replace(/\/$/, '');
 export const BUSINESS_NAME = cfg.businessName || 'Builder Co.';
 
 const TOKEN_KEY = 'builderos.ownerToken';

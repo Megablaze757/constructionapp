@@ -102,7 +102,7 @@ async function boot() {
 function buildEnv(db) {
   const cfg = window.BUILDEROS_CONFIG || {};
   const base = location.origin + location.pathname.replace(/[^/]*$/, '');
-  const aiBase = (cfg.aiBase || localStorage.getItem('builderos.aiBase') || '').replace(/\/$/, '');
+  const aiBase = (localStorage.getItem('builderos.aiBase') || cfg.aiBase || '').replace(/\/$/, '');
 
   return {
     DB: db,
@@ -116,7 +116,7 @@ function buildEnv(db) {
     // deployed, drafts go through it; if not, requestDraft reports itself
     // unconfigured and the API falls back to the template.
     AI_PROXY_URL: aiBase ? `${aiBase}/draft` : '',
-    AI_PROXY_TOKEN: cfg.aiToken || localStorage.getItem('builderos.aiToken') || '',
+    AI_PROXY_TOKEN: localStorage.getItem('builderos.aiToken') || cfg.aiToken || '',
   };
 }
 
