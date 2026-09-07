@@ -37,12 +37,19 @@ Nothing at all for step 0. For the rest:
 
 ## 0. Pages on its own (no Worker)
 
-Push to `main`. The Pages workflow publishes `web/` to the `gh-pages` branch.
-GitHub then serves it from that branch — no need to switch Pages over to
-“GitHub Actions” (that setting cannot be changed from a workflow, which is why
-deploys used to fail). If the site 404s after the first green run, set
-**Settings → Pages → Build and deployment → Source: Deploy from a branch**,
-branch `gh-pages`, folder `/ (root)`.
+**One-time, before the first push does anything:** Settings → Pages → Build
+and deployment → **Source: GitHub Actions** → Save. GitHub's own Pages API
+refuses to create a site's first deployment target for a plain `GITHUB_TOKEN`
+— it isn't a workflow bug, it's a deliberate restriction (creating one needs
+a Personal Access Token or GitHub App with admin rights, which this workflow
+deliberately doesn't ask you to hand it). This one click is the only manual
+step in the whole pipeline. Everything after it is automatic.
+
+Then push to `main`. The Pages workflow builds nothing (there's nothing to
+build — `web/` is plain ES modules) and uploads `web/` directly as the Pages
+artifact; GitHub serves it from there. No `gh-pages` branch, no extra token
+permissions — `actions/deploy-pages` deploys over OIDC (`id-token: write`),
+so this job never needs `contents: write` at all.
 
 With neither `API_BASE` nor `AI_BASE` set, the published site runs everything
 locally and says so at the top of every screen.
@@ -160,10 +167,17 @@ the same as trusting it with the contract.
 
 ## 3. GitHub Pages
 
-The workflow on `main` pushes `web/` to `gh-pages`. If Pages is not serving yet:
-**Settings → Pages → Build and deployment → Source: Deploy from a branch**,
-branch `gh-pages`, folder `/ (root)`. A first successful push of that branch
-usually turns Pages on by itself for a public repo.
+If you skipped step 0: **Settings → Pages → Build and deployment → Source:
+GitHub Actions** → Save, before the first push. Without this, the `deploy`
+job fails with `Get Pages site failed` — that message means exactly what it
+says, not that something is broken. It's a one-time click; nothing after it
+is manual.
+
+**If `build` fails instead** — the step that runs `actions/configure-pages`
+or `actions/upload-pages-artifact` — check the Actions tab log directly; with
+no `gh-pages` branch and no `contents: write` in play, the remaining failure
+modes are ordinary ones (a bad path, a missing permission on a fork) rather
+than the token-scope trap the old branch-push method had.
 
 Then **Settings → Secrets and variables → Actions → Variables**, add:
 
