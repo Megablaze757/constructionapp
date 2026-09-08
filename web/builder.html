@@ -35,6 +35,21 @@
     </div>
   </div>
 
+  <!-- Building Plans & Pre-existing Quote Templates Upload Dropzone -->
+  <div class="card">
+    <h2>📁 Building Plans &amp; Quote Templates</h2>
+    <div class="card-body">
+      <div class="dropzone" id="plan-dropzone">
+        <div class="dropzone-icon">📄</div>
+        <div class="dropzone-title">Drop plans or existing quote documents here</div>
+        <div class="dropzone-sub">Upload PDF blueprints, architectural drawings, or previous quote templates (PDF, PNG, JPG, TXT, CSV)</div>
+        <input type="file" id="plan-input" accept=".pdf,image/*,.txt,.csv,.md" multiple hidden>
+        <button class="btn btn-sm" id="plan-browse-btn" type="button" style="margin-top: 4px;">Browse files</button>
+      </div>
+      <div class="plan-grid" id="plan-grid"></div>
+    </div>
+  </div>
+
   <!-- Voice / typed description → AI draft -->
   <div class="card">
     <h2>🎙️ Describe the job</h2>
@@ -46,7 +61,7 @@
       <p class="muted" style="margin:0">Your own notes and the AI's input. The client never sees this.</p>
       <label class="inline-check" id="use-photos-row" hidden>
         <input type="checkbox" id="use-photos" checked>
-        <span>Let the AI look at your site photos <span class="muted" id="photo-count"></span></span>
+        <span>Let the AI look at your site photos &amp; attached plans <span class="muted" id="photo-count"></span></span>
       </label>
       <button class="btn btn-primary" id="draft-btn" type="button">Generate Draft with AI</button>
     </div>
