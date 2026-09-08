@@ -42,11 +42,11 @@ export async function processDocument(file) {
   }
 
   if (isPdf) {
-    // Attempt text extraction or arrayBuffer fallback
     try {
-      const text = await file.text();
-      const printable = text.replace(/[^\x20-\x7E\n\r\t]/g, '');
-      if (printable.length > 100) {
+      // Try extracting text first
+      const rawText = await file.text();
+      const printable = rawText.replace(/[^\x20-\x7E\n\r\t]/g, '');
+      if (printable.length > 200) {
         return {
           name,
           type: 'template',
@@ -55,14 +55,13 @@ export async function processDocument(file) {
         };
       }
     } catch (e) {
-      // ignore and fallback
+      // proceed to fallback
     }
-    // Default to binary placeholder note
     return {
       name,
       type: 'plan',
       mime: 'application/pdf',
-      text: `[PDF Document attached: ${name} (${(file.size / 1024).toFixed(1)} KB)]`,
+      text: `[PDF Plan attached: ${name} (${(file.size / 1024).toFixed(1)} KB)]`,
     };
   }
 

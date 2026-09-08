@@ -411,6 +411,14 @@ dialog::backdrop { background: rgba(8, 12, 18, 0.6); backdrop-filter: blur(4px);
 dialog .card-body { padding: 20px; }
 dialog h2 { margin: 0; font-size: 18px; }
 
+/* Print Styles */
+@media print {
+  body { background: #fff !important; color: #000 !important; }
+  .topbar, .actionbar, .dropzone, button, .back, #actions { display: none !important; }
+  .shell { max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
+  .card { box-shadow: none !important; border: 1px solid #ccc !important; break-inside: avoid; }
+}
+
 .spinner {
   width: 18px; height: 18px; flex: none;
   border: 2.5px solid currentColor; border-right-color: transparent;
