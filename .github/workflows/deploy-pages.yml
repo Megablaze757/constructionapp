@@ -14,30 +14,26 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
-# Publish to the gh-pages branch. That matches GitHub's default Pages source
-# (Deploy from a branch) — GITHUB_TOKEN cannot switch Source to GitHub Actions.
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
   deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      # The site is plain ES modules — nothing to build, so the artifact is the
-      # directory as committed. Any bundler here would only add ways to break.
-      # Both are optional. With neither set the published site runs the Worker's
-      # own source in the browser and drafts from the job template — usable on
-      # day one, on one device, which the site says on every screen.
       - name: Point the frontend at whatever has been deployed
         env:
           API_BASE: ${{ vars.API_BASE }}
           AI_BASE: ${{ vars.AI_BASE }}
           BUSINESS_NAME: ${{ vars.BUSINESS_NAME }}
         run: |
-          # Full Worker (D1) is optional. The live URL is the paste-in AI worker
-          # (service: builderos-ai) — that belongs in aiBase, not apiBase.
           AI_BASE="${AI_BASE:-https://construction.fitnessguru.workers.dev}"
           {
             echo "window.BUILDEROS_CONFIG = {"
@@ -50,21 +46,13 @@ jobs:
             echo "::notice::API_BASE unset — quotes stay on-device; AI drafts go to ${AI_BASE}."
           fi
           cat web/config.js
-          # Stop Jekyll from hiding files/folders; this is a static app, not a blog.
           touch web/.nojekyll
 
-      - name: Publish web/ to the gh-pages branch
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          cd web
-          git init
-          git checkout -b gh-pages
-          git add -A
-          git -c user.name='github-actions[bot]' \
-              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-              commit -m "Publish web to GitHub Pages"
-          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
-          echo "::notice::Published. In Settings → Pages, set Source to Deploy from a branch, Branch gh-pages, folder / (root)."
-          echo "Site: https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/"
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
