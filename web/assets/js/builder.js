@@ -187,38 +187,42 @@ function renderAiSummary(summary) {
 }
 
 function renderLines() {
-  const container = $('lines');
-  container.innerHTML = state.lines.map((l) => `
-    <div class="line ${l.confirmed ? '' : 'unconfirmed'}" data-code="${esc(l.line_code)}">
-      <div class="line-desc">
-        ${l.confirmed ? '' : '<span class="dot" title="Unconfirmed AI draft line"></span>'}
-        <span>${esc(l.description)}</span>
-        <span class="tag ${l.source?.includes('ai') || l.source?.includes('photo') ? 'tag-ai' : ''}">${esc(l.source || 'manual')}</span>
-      </div>
-      <div class="line-price">${price(l.amount)}</div>
-      <div class="line-qty">${esc(l.quantity)} ${esc(l.unit)} @ ${price(l.unit_price)}</div>
-      ${l.note ? `<div class="line-note">⚠️ ${esc(l.note)}</div>` : ''}
-      <div class="line-actions">
-        ${l.confirmed ? '' : `<button class="btn btn-sm btn-accept confirm-btn" data-code="${esc(l.line_code)}" type="button">Confirm ✓</button>`}
-        <button class="btn btn-sm edit-btn" data-code="${esc(l.line_code)}" type="button">Edit</button>
-      </div>
-    </div>
-  `).join('');
-
-  container.querySelectorAll('.confirm-btn').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      try {
-        apply(await api.confirmLine(quoteId, btn.dataset.code));
-      } catch (err) {
-        reportError(err);
-      }
-    });
-  });
-
-  container.querySelectorAll('.edit-btn').forEach((btn) => {
-    btn.addEventListener('click', () => openLineDialog(btn.dataset.code));
-  });
+  const base = state.lines.filter((l) => l.kind !== 'extra');
+  const host = $('lines');
+  if (!host) return;
+  if (!base.length) {
+    host.innerHTML = '<div class="card-body muted">No line items yet.</div>';
+    return;
+  }
+  host.innerHTML = base.map(lineMarkup).join('');
+  host.querySelectorAll('[data-edit]').forEach((btn) =>
+    btn.addEventListener('click', () => openLineDialog(btn.dataset.edit)));
+  host.querySelectorAll('[data-confirm]').forEach((btn) =>
+    btn.addEventListener('click', () => confirmLine(btn.dataset.confirm)));
 }
+
+function lineMarkup(l) {
+  const tag = l.source === 'photo_inferred' ? '📷 from photo'
+    : l.source === 'ai_inferred' ? '🤖 AI est.' : null;
+  const unconfirmed = !l.confirmed;
+  return `
+    <div class="line ${unconfirmed ? 'unconfirmed' : ''}">
+      <div class="line-desc">
+        ${unconfirmed ? '<span class="dot" title="Not yet confirmed"></span>' : ''}
+        <span>${esc(l.description)}</span>
+        ${tag ? `<span class="tag tag-ai">${esc(tag)}</span>` : ''}
+      </div>
+      <div class="line-price">${price(l.line_price)}</div>
+      <div class="line-qty">${formatQty(l.quantity)} ${esc(l.unit)}${l.unit_price ? ` @ ${price(l.unit_price)}` : ''}</div>
+      ${l.note ? `<div class="line-note">${esc(l.note)}</div>` : ''}
+      <div class="line-actions">
+        <button class="btn btn-sm" type="button" data-edit="${esc(l.id)}">edit</button>
+        ${unconfirmed ? `<button class="btn btn-sm btn-primary" type="button" data-confirm="${esc(l.id)}">Tap to confirm</button>` : ''}
+      </div>
+    </div>`;
+}
+
+const formatQty = (n) => (Number.isInteger(Number(n)) ? String(n) : String(Number(n)));
 
 function renderExtras() {
   const container = $('extras');
