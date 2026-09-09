@@ -26,6 +26,41 @@
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
 }
 
+/* Bottom Navigation Bar (10/10 Mobile App UX) */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+}
+.bottom-nav a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: var(--ink-2);
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 10px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.bottom-nav a.active, .bottom-nav a:hover {
+  color: var(--brand);
+  background: var(--brand-light);
+}
+.bottom-nav-icon { font-size: 20px; line-height: 1; }
+
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #090d16;
