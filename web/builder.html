@@ -97,6 +97,23 @@
   <!-- Line items -->
   <div class="card">
     <h2>Line items <span id="margin-badge" class="badge badge-ok">—</span></h2>
+    <!-- Cost Allocation Visualizer -->
+    <div style="padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--surface-2);">
+      <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--ink-2); margin-bottom: 6px;">
+        <span>Cost Breakdown</span>
+        <span id="margin-line">—</span>
+      </div>
+      <div style="height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; display: flex;">
+        <div id="bar-labour" style="background: var(--brand); width: 0%; height: 100%; transition: width 0.3s ease;" title="Labour"></div>
+        <div id="bar-material" style="background: var(--ok); width: 0%; height: 100%; transition: width 0.3s ease;" title="Material"></div>
+        <div id="bar-plant" style="background: var(--warn); width: 0%; height: 100%; transition: width 0.3s ease;" title="Plant"></div>
+      </div>
+      <div style="display: flex; gap: 12px; font-size: 11px; font-weight: 600; margin-top: 6px; color: var(--ink-2);">
+        <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--brand);"></span> Labour</span>
+        <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--ok);"></span> Material</span>
+        <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--warn);"></span> Plant / Other</span>
+      </div>
+    </div>
     <div class="lines" id="lines"></div>
     <div class="card-body">
       <button class="btn" id="add-line-btn" type="button">+ Add line item</button>
