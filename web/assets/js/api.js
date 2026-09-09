@@ -125,23 +125,23 @@ export async function ready() {
 const BANNERS = {
   unconfigured: {
     tone: '#8a5a00',
-    text: '<strong>Running in this browser.</strong> No Worker is configured, so everything is stored on this device only — client links and crew links will not open anywhere else.',
+    text: '<strong>Running On-Device Mode.</strong> Connect Cloud Sync in Settings to share client links, sync crew schedules, and backup quotes across devices.',
     action: null,
   },
   unreachable: {
     tone: '#8a5a00',
-    text: '<strong>Running in this browser.</strong> The Worker at that address is not answering yet, so everything is stored on this device only.',
+    text: '<strong>Running On-Device Mode.</strong> Cloud Server is connecting; quotes and jobs are safely stored on this device.',
     action: null,
   },
   chosen: {
     tone: '#8a5a00',
-    text: '<strong>Running in this browser</strong> by choice. Everything is stored on this device only.',
-    action: { label: 'Use the Worker', fn: () => useNetworkMode() },
+    text: '<strong>Running On-Device Mode</strong> by choice. Data is kept locally on this device.',
+    action: { label: 'Connect Cloud Sync', fn: () => useNetworkMode() },
   },
   down: {
     tone: '#9b1c1c',
-    text: '<strong>The Worker is not answering.</strong> Your data is on it, not here, so nothing has been loaded. This is a connection or deployment problem, not lost work.',
-    action: { label: 'Work in this browser instead', fn: () => useLocalMode() },
+    text: '<strong>Cloud Sync Server Offline.</strong> Your data is saved on the cloud server. Reconnecting automatically when service resumes.',
+    action: { label: 'Work On-Device instead', fn: () => useLocalMode() },
   },
 };
 

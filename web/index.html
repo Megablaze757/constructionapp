@@ -54,33 +54,30 @@
 
 <dialog id="settings-dialog">
   <form method="dialog" class="card-body">
-    <h2>Connection</h2>
+    <h2>App &amp; Cloud Settings</h2>
     <p class="muted" style="margin:0" id="mode-explainer"></p>
 
-    <label>API base URL
-      <input type="text" id="api-base-display" readonly>
+    <label>Cloud Server Endpoint
+      <input type="text" id="api-base-display" placeholder="https://your-cloud-server.com" readonly>
     </label>
-    <label>Owner token
-      <input type="text" id="owner-token" placeholder="paste your OWNER_TOKEN" autocomplete="off">
+    <label>Security Access Token
+      <input type="text" id="owner-token" placeholder="Enter your access passkey" autocomplete="off">
     </label>
 
-    <h2 style="margin-top:4px">AI drafting</h2>
+    <h2 style="margin-top:10px">AI Estimating Engine</h2>
     <p class="muted" style="margin:0">
-      An API key cannot live in a browser, so AI drafting needs something to sit behind.
-      Paste the URL of the small AI worker — <code>worker/paste/ai-worker.js</code>, pasted
-      into the Cloudflare dashboard. Leave it empty and drafts come from the job template
-      instead, with every line marked for checking.
+      Connect your AI estimation engine to enable instant blueprint plan parsing, auto-quoting from existing templates, and voice-to-quote conversion.
     </p>
-    <label>AI worker URL
-      <input type="text" id="ai-base" placeholder="https://builderos-ai.you.workers.dev" autocomplete="off">
+    <label>AI Service Endpoint
+      <input type="text" id="ai-base" placeholder="https://ai.your-server.com" autocomplete="off">
     </label>
-    <label>AI worker token <span class="muted">(only if you set AI_SHARED_TOKEN)</span>
-      <input type="text" id="ai-token" placeholder="optional" autocomplete="off">
+    <label>AI Access Token <span class="muted">(optional)</span>
+      <input type="text" id="ai-token" placeholder="Enter AI access token" autocomplete="off">
     </label>
 
-    <div class="btn-row">
+    <div class="btn-row" style="margin-top: 12px;">
       <button class="btn" value="cancel" type="submit">Cancel</button>
-      <button class="btn btn-primary" id="save-settings" value="save" type="submit">Save</button>
+      <button class="btn btn-primary" id="save-settings" value="save" type="submit">Save Settings</button>
     </div>
   </form>
 </dialog>
