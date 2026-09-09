@@ -76,11 +76,17 @@
 
 <dialog id="confirm-dialog">
   <form method="dialog" class="card-body">
-    <h2>Book this job?</h2>
+    <h2>Book &amp; Sign this job</h2>
     <p class="muted" id="confirm-detail" style="margin:0"></p>
-    <div class="btn-row">
+    <label style="margin-top: 8px;">Draw your signature below:
+      <div style="border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface-2); margin-top: 4px;">
+        <canvas id="signature-canvas" width="380" height="120" style="touch-action: none; display: block; cursor: crosshair; width: 100%; height: 120px;"></canvas>
+      </div>
+    </label>
+    <button class="btn btn-sm btn-ghost" id="clear-sig-btn" type="button" style="margin-top: 4px; width: fit-content;">Clear signature</button>
+    <div class="btn-row" style="margin-top: 12px;">
       <button class="btn" value="cancel" type="submit">Not yet</button>
-      <button class="btn btn-accept" value="accept" type="submit">Yes, book it</button>
+      <button class="btn btn-accept" value="accept" type="submit">Sign &amp; Book Job</button>
     </div>
   </form>
 </dialog>

@@ -149,11 +149,65 @@ function renderTotal() {
 /* ------------------------------------------------------------------ accept */
 
 const confirmDialog = $('confirm-dialog');
+let isSigning = false;
+let sigPoints = 0;
+
+function initSignatureCanvas() {
+  const canvas = $('signature-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.strokeStyle = '#0f172a';
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  const getPos = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: (clientX - rect.left) * (canvas.width / rect.width),
+      y: (clientY - rect.top) * (canvas.height / rect.height),
+    };
+  };
+
+  const startDraw = (e) => {
+    isSigning = true;
+    sigPoints++;
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+  };
+
+  const draw = (e) => {
+    if (!isSigning) return;
+    e.preventDefault();
+    sigPoints++;
+    const pos = getPos(e);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+  };
+
+  const stopDraw = () => { isSigning = false; };
+
+  canvas.addEventListener('mousedown', startDraw);
+  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', stopDraw);
+  canvas.addEventListener('touchstart', startDraw, { passive: false });
+  canvas.addEventListener('touchmove', draw, { passive: false });
+  canvas.addEventListener('touchend', stopDraw);
+
+  $('clear-sig-btn')?.addEventListener('click', () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    sigPoints = 0;
+  });
+}
 
 $('accept-btn').addEventListener('click', () => {
   const total = $('total').textContent;
   $('confirm-detail').textContent = `You're booking ${titleCase(quote.job_type)} at ${total}.`;
   confirmDialog.showModal();
+  setTimeout(initSignatureCanvas, 100);
 });
 
 confirmDialog.addEventListener('close', async () => {
