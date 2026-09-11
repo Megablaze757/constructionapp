@@ -53,6 +53,7 @@ function personRow(p) {
       <div class="line-price">${p.day_rate ? `${price(p.day_rate)}/day` : ''}</div>
       <div class="line-qty">${esc(detail || '—')}${p.phone ? ` · <a href="tel:${esc(p.phone)}">${esc(p.phone)}</a>` : ''}</div>
       <div class="line-actions">
+        ${p.phone ? `<a class="btn btn-sm btn-whatsapp" href="https://wa.me/${esc(p.phone.replace(/[^0-9]/g, ''))}" target="_blank" rel="noopener" style="padding:4px 10px; font-size:12px; min-height:36px;">💬 WhatsApp</a>` : ''}
         <button class="btn btn-sm" type="button" data-edit="${esc(p.id)}">edit</button>
       </div>
     </div>`;

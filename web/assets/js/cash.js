@@ -107,6 +107,7 @@ function invoiceRow(i) {
       <div class="line-actions">
         ${i.status === 'draft' ? `<button class="btn btn-sm btn-primary" data-send="${esc(i.id)}" type="button">Mark sent</button>` : ''}
         ${!i.settled && i.status !== 'draft' ? `<button class="btn btn-sm" data-pay="${esc(i.id)}" type="button">Record payment</button>` : ''}
+        ${!i.settled && i.status !== 'draft' ? `<button class="btn btn-sm btn-whatsapp" data-chase-wa="${esc(i.id)}" data-client="${esc(i.client_name)}" data-num="${esc(i.number)}" data-due="${esc(price(i.outstanding || i.amount))}" type="button" style="padding:4px 10px; font-size:12px; min-height:36px;">💬 WhatsApp Chase</button>` : ''}
       </div>
     </div>`;
 }
