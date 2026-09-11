@@ -150,7 +150,7 @@ function render() {
   renderTotals();
 }
 
-const HEADER_FIELDS = ['client_name', 'site_address', 'description', 'client_summary'];
+const HEADER_FIELDS = ['client_name', 'client_phone', 'site_address', 'description', 'client_summary'];
 
 const touched = new Set();
 for (const id of HEADER_FIELDS) {
@@ -291,4 +291,112 @@ ${planText}` : planText;
   }
 });
 
-boot();
+/* -------------------------------------------------------- voice recording */
+
+function initSpeechRecognition() {
+  const btn = $('record-btn');
+  if (!btn) return;
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    btn.title = 'Web Speech API not supported in this browser. You can type directly below.';
+    btn.addEventListener('click', () => {
+      $('description')?.focus();
+    });
+    return;
+  }
+
+  const recognition = new SpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-GB';
+
+  let isRecording = false;
+
+  btn.addEventListener('click', () => {
+    if (isRecording) {
+      recognition.stop();
+    } else {
+      try {
+        recognition.start();
+      } catch (err) {
+        console.error('Speech recognition error:', err);
+      }
+    }
+  });
+
+  recognition.onstart = () => {
+    isRecording = true;
+    btn.classList.add('recording');
+    btn.innerHTML = '🔴 Listening... Speak now (Tap to stop)';
+  };
+
+  recognition.onend = () => {
+    isRecording = false;
+    btn.classList.remove('recording');
+    btn.innerHTML = '● Hold / Tap to speak quote';
+  };
+
+  recognition.onresult = (event) => {
+    let transcript = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
+    }
+    const desc = $('description');
+    if (desc && transcript.trim()) {
+      desc.value = desc.value ? `${desc.value} ${transcript.trim()}` : transcript.trim();
+      touched.add('description');
+    }
+  };
+}
+
+initSpeechRecognition();
+
+/* --------------------------------------------------- whatsapp & link share */
+
+function getPublicQuoteUrl() {
+  return `${location.origin}/quote.html?id=${encodeURIComponent(quoteId)}`;
+}
+
+function shareQuoteWhatsApp() {
+  const q = state.quote;
+  const clientName = $('client_name')?.value.trim() || q?.client_name || '';
+  const clientPhone = $('client_phone')?.value.trim() || q?.client_phone || '';
+  const siteAddr = $('site_address')?.value.trim() || q?.site_address || '';
+  const quoteUrl = getPublicQuoteUrl();
+
+  const message = `Hi ${clientName ? clientName : 'there'}, here is your quote for ${siteAddr ? siteAddr : 'your job'}:
+${quoteUrl}
+
+Please review and let me know if you have any questions!`;
+
+  let waUrl = '';
+  const cleanPhone = clientPhone.replace(/[^0-9]/g, '');
+  if (cleanPhone) {
+    waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+  } else {
+    waUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+  }
+
+  window.open(waUrl, '_blank', 'noopener,noreferrer');
+}
+
+async function copyQuoteLink() {
+  const quoteUrl = getPublicQuoteUrl();
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(quoteUrl);
+      banner('warn', '<strong>Quote link copied!</strong> Link copied to clipboard.');
+    } else if (navigator.share) {
+      await navigator.share({ title: 'Quote', url: quoteUrl });
+    } else {
+      prompt('Copy quote link below:', quoteUrl);
+    }
+  } catch (err) {
+    console.error('Copy/Share failed:', err);
+  }
+}
+
+$('whatsapp-share-btn')?.addEventListener('click', shareQuoteWhatsApp);
+$('copy-link-btn')?.addEventListener('click', copyQuoteLink);
+

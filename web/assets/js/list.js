@@ -137,16 +137,34 @@ async function loadQuotes() {
     }
     list.innerHTML = quotes
       .map((q) => `
-        <a class="quote-item" href="builder.html?id=${encodeURIComponent(q.id)}">
-          <span class="who">${esc(q.client_name)}</span>
-          <span class="status status-${esc(q.status)}">${esc(q.status)}</span>
-          <span class="meta">
-            ${esc(titleCase(q.job_type))}${q.site_address ? ` · ${esc(q.site_address)}` : ''}
-            · ${price(q.subtotal_price)}${q.status !== 'draft' ? ` · ${q.margin_pct}% margin` : ''}
-            · ${esc(formatDate(q.created_at))}
-          </span>
-        </a>`)
+        <div class="quote-row" style="display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--line); padding:8px 0;">
+          <a class="quote-item" href="builder.html?id=${encodeURIComponent(q.id)}" style="flex:1; text-decoration:none; color:inherit;">
+            <span class="who" style="font-weight:700;">${esc(q.client_name || 'Unnamed Client')}</span>
+            <span class="status status-${esc(q.status)}">${esc(q.status)}</span>
+            <span class="meta" style="display:block; font-size:12px; color:var(--ink-2);">
+              ${esc(titleCase(q.job_type))}${q.site_address ? ` · ${esc(q.site_address)}` : ''}
+              · ${price(q.subtotal_price)}${q.status !== 'draft' ? ` · ${q.margin_pct}% margin` : ''}
+              · ${esc(formatDate(q.created_at))}
+            </span>
+          </a>
+          <button class="btn btn-sm btn-whatsapp" data-share-wa="${esc(q.id)}" data-client="${esc(q.client_name || '')}" data-site="${esc(q.site_address || '')}" type="button" style="padding:6px 10px; font-size:13px;" title="Share quote via WhatsApp">💬 WhatsApp</button>
+        </div>`)
       .join('');
+
+    list.querySelectorAll('[data-share-wa]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const qId = btn.dataset.shareWa;
+        const client = btn.dataset.client;
+        const site = btn.dataset.site;
+        const quoteUrl = `${location.origin}/quote.html?id=${encodeURIComponent(qId)}`;
+        const msg = `Hi ${client ? client : 'there'}, here is your quote for ${site ? site : 'your job'}:
+${quoteUrl}
+
+Please review and let me know if you have any questions!`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+      });
+    });
   } catch (err) {
     list.innerHTML = '<div class="card-body muted">Could not load quotes.</div>';
     reportError(err);

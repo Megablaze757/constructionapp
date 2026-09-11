@@ -26,6 +26,9 @@
       <label>Client
         <input type="text" id="client_name" autocomplete="off">
       </label>
+      <label>Client phone (WhatsApp)
+        <input type="tel" id="client_phone" placeholder="e.g. 07700 900123" autocomplete="off">
+      </label>
       <label>Job type
         <input type="text" id="job_type_display" readonly>
       </label>
@@ -54,7 +57,7 @@
   <div class="card">
     <h2>🎙️ Describe the job</h2>
     <div class="card-body">
-      <button class="btn btn-record" id="record-btn" type="button">● Hold to record voice note</button>
+      <button class="btn btn-voice btn-record" id="record-btn" type="button">● Hold / Tap to speak quote</button>
       <p class="muted" id="record-hint" style="margin:0">or type the description below</p>
       <label class="sr-only" for="description">Job description</label>
       <textarea id="description" placeholder="Rear scaffold, 2 lifts, roofer access, up 5 days"></textarea>
@@ -143,9 +146,13 @@
 </div>
 
 <div class="actionbar">
-  <div class="inner">
-    <button class="btn" id="preview-btn" type="button">Preview as Client</button>
-    <button class="btn btn-primary" id="send-btn" type="button">Send Quote →</button>
+  <div class="inner" style="flex-direction: column; gap: 8px;">
+    <button class="btn btn-whatsapp" id="whatsapp-share-btn" type="button">🟢 Send via WhatsApp</button>
+    <div class="btn-row" style="width: 100%;">
+      <button class="btn" id="copy-link-btn" type="button">📋 Copy Link</button>
+      <button class="btn" id="preview-btn" type="button">Preview as Client</button>
+    </div>
+    <button class="btn btn-primary" id="send-btn" type="button">Mark Sent →</button>
   </div>
 </div>
 
