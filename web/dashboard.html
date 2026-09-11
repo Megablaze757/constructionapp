@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1a56db">
+<meta name="theme-color" content="#0f172a">
 <title>Dashboard — BuilderOS</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
@@ -13,66 +13,65 @@
 <body>
 <div class="shell">
   <div class="topbar">
-    <h1>Dashboard</h1>
-    <button class="btn btn-sm" id="refresh-btn" type="button">Refresh</button>
+    <h1>BuilderOS Command Centre</h1>
+    <button class="btn btn-sm" id="refresh-btn" type="button">🔄 Refresh</button>
   </div>
 
   <div id="banner"></div>
 
-  <!-- The four numbers -->
+  <!-- Key Metrics Summary -->
   <div class="card">
+    <h2>📊 Business Health</h2>
     <div class="card-body">
-      <div class="tiles" id="tiles"><span class="muted">Loading…</span></div>
+      <div class="tiles" id="tiles"><span class="muted">Loading financial &amp; job metrics…</span></div>
     </div>
   </div>
 
-  <!-- Needs your decision -->
+  <!-- Needs Your Decision -->
   <div class="card" id="decisions-card" hidden>
-    <h2>Needs your decision</h2>
-    <div class="lines" id="decisions"></div>
+    <h2>⚠️ Needs Your Decision</h2>
+    <div class="card-body" id="decisions"></div>
   </div>
 
-  <!-- At-risk jobs -->
+  <!-- At-Risk Jobs -->
   <div class="card" id="risk-card" hidden>
-    <h2>At-risk jobs</h2>
-    <div class="lines" id="risks"></div>
+    <h2>🚨 At-Risk Jobs</h2>
+    <div class="card-body" id="risks"></div>
   </div>
 
-  <!-- Job status overview -->
+  <!-- Jobs Running -->
   <div class="card">
-    <h2>Jobs running</h2>
-    <div class="lines" id="jobs"></div>
+    <h2>🏗️ Active Jobs</h2>
+    <div class="card-body" id="jobs"></div>
   </div>
 
-  <!-- Cash -->
+  <!-- Cash & Invoicing -->
   <div class="card">
-    <h2>Cash <a class="btn btn-sm" href="cash.html">Details →</a></h2>
+    <h2>💷 Cash Flow <a class="btn btn-sm" href="cash.html">Details →</a></h2>
     <div class="card-body" id="cash"></div>
   </div>
 
-  <!-- Margin -->
+  <!-- Margin Health -->
   <div class="card">
-    <h2>Margin on live work <a class="btn btn-sm" href="variance.html">Variance →</a></h2>
+    <h2>📈 Live Margin Health <a class="btn btn-sm" href="variance.html">Variance →</a></h2>
     <div class="card-body" id="margin"></div>
   </div>
 
-  <!-- Reliability -->
+  <!-- Team Reliability -->
   <div class="card">
-    <h2>Reliability <a class="btn btn-sm" href="team.html">Team →</a></h2>
+    <h2>👷 Crew Reliability <a class="btn btn-sm" href="team.html">Team →</a></h2>
     <div class="card-body" id="reliability"></div>
   </div>
-
-  <div class="card">
-    <div class="card-body">
-      <div class="btn-row">
-        <a class="btn btn-sm" href="index.html">Quotes</a>
-        <a class="btn btn-sm" href="jobs.html">Jobs</a>
-        <a class="btn btn-sm" href="sops.html">SOPs</a>
-        <a class="btn btn-sm" href="automations.html">Automations</a>
-      </div>
-    </div>
-  </div>
 </div>
+
+<!-- Bottom Navigation Bar for UK Builders on Site -->
+<nav class="bottom-nav" aria-label="Mobile Navigation">
+  <a href="dashboard.html" class="active"><span class="bottom-nav-icon">📊</span>Dashboard</a>
+  <a href="index.html"><span class="bottom-nav-icon">📋</span>Quotes</a>
+  <a href="jobs.html"><span class="bottom-nav-icon">🏗️</span>Jobs</a>
+  <a href="cash.html"><span class="bottom-nav-icon">💷</span>Cash</a>
+  <a href="sops.html"><span class="bottom-nav-icon">✅</span>SOPs</a>
+</nav>
 
 <script type="module" src="assets/js/dashboard.js"></script>
 </body>
