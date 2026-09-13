@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Owner Passkey Lock — BuilderOS</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/app.css">
+<script src="config.js"></script>
+<style>
+  .pin-display {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin: 20px 0;
+  }
+  .pin-dot {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid var(--brand);
+    background: transparent;
+    transition: all 0.15s ease;
+  }
+  .pin-dot.filled {
+    background: var(--brand);
+    box-shadow: 0 0 10px var(--brand);
+  }
+  .keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    max-width: 320px;
+    margin: 0 auto;
+  }
+  .keypad-btn {
+    height: 64px;
+    font-size: 24px;
+    font-weight: 800;
+    border-radius: 16px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    user-select: none;
+  }
+  .keypad-btn:active {
+    background: var(--brand);
+    color: #fff;
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar" style="justify-content: center;">
+    <h1>🔒 BuilderOS Security</h1>
+  </div>
+
+  <div id="banner"></div>
+
+  <div class="card" style="text-align: center; padding: 24px 16px;">
+    <h2>Owner PIN Lock</h2>
+    <p class="muted" style="margin-top: 4px;">Enter your 4-digit owner PIN to access business finances, margin gates, and client quotes.</p>
+
+    <div class="pin-display" id="pin-dots">
+      <div class="pin-dot"></div>
+      <div class="pin-dot"></div>
+      <div class="pin-dot"></div>
+      <div class="pin-dot"></div>
+    </div>
+
+    <div class="keypad" id="keypad">
+      <button class="keypad-btn" data-key="1" type="button">1</button>
+      <button class="keypad-btn" data-key="2" type="button">2</button>
+      <button class="keypad-btn" data-key="3" type="button">3</button>
+      <button class="keypad-btn" data-key="4" type="button">4</button>
+      <button class="keypad-btn" data-key="5" type="button">5</button>
+      <button class="keypad-btn" data-key="6" type="button">6</button>
+      <button class="keypad-btn" data-key="7" type="button">7</button>
+      <button class="keypad-btn" data-key="8" type="button">8</button>
+      <button class="keypad-btn" data-key="9" type="button">9</button>
+      <button class="keypad-btn" data-key="clear" type="button" style="font-size:16px;">⌫</button>
+      <button class="keypad-btn" data-key="0" type="button">0</button>
+      <button class="keypad-btn" data-key="enter" type="button" style="font-size:16px; background:var(--brand); color:#fff;">🔓</button>
+    </div>
+  </div>
+
+  <div class="card" style="text-align: center; margin-top: 20px;">
+    <div class="card-body">
+      <p class="muted" style="margin:0;">Handing your phone to site crew?</p>
+      <a class="btn btn-primary" href="crew.html" style="margin-top: 8px;">👷 Switch to Crew Field View →</a>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { ownerToken } from './assets/js/api.js';
+
+  let enteredPin = '';
+  const DEFAULT_PIN = localStorage.getItem('builderos.ownerPin') || '1234';
+  const dots = document.querySelectorAll('.pin-dot');
+  const banner = document.getElementById('banner');
+
+  function updateDots() {
+    dots.forEach((dot, idx) => {
+      if (idx < enteredPin.length) dot.classList.add('filled');
+      else dot.classList.remove('filled');
+    });
+  }
+
+  function checkPin() {
+    if (enteredPin === DEFAULT_PIN || enteredPin === '1234') {
+      localStorage.setItem('builderos.pinAuthed', 'true');
+      banner.innerHTML = '<div class="notice notice-info"><strong>Unlocked!</strong> Opening dashboard...</div>';
+      setTimeout(() => { location.href = 'dashboard.html'; }, 400);
+    } else {
+      banner.innerHTML = '<div class="notice notice-bad"><strong>Incorrect PIN.</strong> Default PIN is 1234 or your set PIN.</div>';
+      enteredPin = '';
+      updateDots();
+    }
+  }
+
+  document.getElementById('keypad').addEventListener('click', (e) => {
+    const btn = e.target.closest('.keypad-btn');
+    if (!btn) return;
+    const key = btn.dataset.key;
+    if (key === 'clear') {
+      enteredPin = enteredPin.slice(0, -1);
+    } else if (key === 'enter') {
+      if (enteredPin.length === 4) checkPin();
+    } else if (enteredPin.length < 4) {
+      enteredPin += key;
+      if (enteredPin.length === 4) setTimeout(checkPin, 150);
+    }
+    updateDots();
+  });
+</script>
+</body>
+</html>
