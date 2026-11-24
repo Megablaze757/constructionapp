@@ -29,6 +29,10 @@
   --radius: 16px;
   --radius-sm: 10px;
   --tap: 54px;
+  /* Height of the fixed bottom nav, including the device's safe-area inset.
+     Anything else pinned to the bottom offsets by this so the two never
+     overlap — see .actionbar. */
+  --nav-h: calc(62px + env(safe-area-inset-bottom));
   --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
   --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
 }
@@ -104,7 +108,8 @@ body {
   left: 0;
   right: 0;
   z-index: 50;
-  pointer-events: none;
+  box-sizing: border-box;
+  height: var(--nav-h);
   background: rgba(15, 23, 42, 0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -116,7 +121,6 @@ body {
 }
 
 .bottom-nav a {
-  pointer-events: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -338,6 +342,21 @@ button:focus-visible {
   backdrop-filter: blur(20px);
   border-top: 1px solid var(--line);
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+}
+
+/*
+ * Both bars are pinned to the bottom, so on a page that has both they must
+ * stack rather than overlap. A nav sitting on top of the primary action is a
+ * dead button under a thumb, not a z-index detail — and the safe-area inset
+ * belongs to whichever bar is actually against the edge of the screen.
+ */
+body:has(.bottom-nav) .actionbar {
+  bottom: var(--nav-h);
+  padding-bottom: 12px;
+}
+
+body:has(.bottom-nav):has(.actionbar) .shell {
+  padding-bottom: calc(var(--nav-h) + 140px);
 }
 
 .actionbar .inner {

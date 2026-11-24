@@ -109,6 +109,7 @@ function buildEnv(db) {
     OWNER_TOKEN: localOwnerToken(),
     PUBLIC_APP_URL: base,
     BUSINESS_NAME: cfg.businessName || 'Builder Co.',
+    BUSINESS_PHONE: cfg.businessPhone || '',
     // Local mode calls the Worker directly, so nothing is cross-origin and the
     // allowlist has no work to do.
     ALLOWED_ORIGINS: '*',

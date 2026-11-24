@@ -21,9 +21,11 @@ export default async function run() {
   await page.goto(`${WEB}/index.html?api=&local=1`);
   await page.waitForSelector('#builderos-mode-banner', { timeout: 30000 });
   const bar = await page.textContent('#builderos-mode-banner');
-  check(/Running in this browser/.test(bar), 'it says where the data is going', `banner said: ${bar}`);
+  // Wording is the product's to choose; the two claims are not. It has to say
+  // where the data is going, and that links do not work off this device.
+  check(/On-Device Mode|in this browser/.test(bar), 'it says where the data is going', `banner said: ${bar}`);
   check(/will not open anywhere else|this device only/.test(bar),
-    'and that links will not work elsewhere', 'the one-device limit is not stated');
+    'and that links will not work elsewhere', `the one-device limit is not stated: ${bar}`);
 
   step('The seeded business is there to work with');
   await page.waitForFunction(() => document.querySelectorAll('.quote-row, .row, [data-quote-id]').length > 0

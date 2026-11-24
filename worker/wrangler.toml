@@ -19,6 +19,10 @@ GROQ_VISION_MODEL = "meta-llama/llama-4-maverick-17b-128e-instruct"
 GROQ_STRUCTURED_OUTPUTS = "auto"
 # Name used in automated messages to clients.
 BUSINESS_NAME = "Builder Co."
+# Your WhatsApp number in international format, no spaces or +, e.g. "447700900123".
+# Shown to clients as a "WhatsApp Builder" button on their quote. Leave it empty
+# and the button is hidden rather than going nowhere.
+BUSINESS_PHONE = ""
 # "simulated" (default) records what would be sent without sending it.
 # "webhook" POSTs each message to MESSAGING_WEBHOOK_URL so you can wire any
 # provider (Twilio, WhatsApp Business, Zapier, Make) without changing code.

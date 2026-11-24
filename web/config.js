@@ -26,5 +26,10 @@ window.BUILDEROS_CONFIG = {
   apiBase: 'http://127.0.0.1:8787',
   aiBase: '',
   businessName: 'Builder Co.',
+  // Your WhatsApp number, international format, no spaces or + (e.g.
+  // '447700900123'). Used in on-device mode for the client's "WhatsApp Builder"
+  // button; with a Worker, set BUSINESS_PHONE on it instead. Empty hides the
+  // button rather than offering one that goes nowhere.
+  businessPhone: '',
 };
 

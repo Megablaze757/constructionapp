@@ -61,6 +61,7 @@ function render() {
 
   const closed = quote.status === 'accepted' || quote.expired;
   $('actions').hidden = closed || isPreview;
+  initBuilderWhatsApp();
 
   if (isPreview) {
     banner('warn', '<strong>Preview.</strong> This is exactly what your client sees. Buttons are hidden here.');
@@ -200,6 +201,28 @@ function initSignatureCanvas() {
   $('clear-sig-btn')?.addEventListener('click', () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     sigPoints = 0;
+  });
+}
+
+/**
+ * "WhatsApp Builder" — only offered when there is a number behind it.
+ *
+ * A client tapping a dead button on their own quote is worse than not being
+ * offered the option, so the button stays hidden unless the business has set
+ * BUSINESS_PHONE on the Worker.
+ */
+function initBuilderWhatsApp() {
+  const btn = $('builder-wa-btn');
+  if (!btn) return;
+  const phone = (quote.business_phone || '').replace(/[^0-9]/g, '');
+  if (!phone) return (btn.hidden = true);
+
+  btn.hidden = false;
+  btn.addEventListener('click', () => {
+    const who = quote.business_name ? ` ${quote.business_name}` : '';
+    const message = `Hi${who}, I've got a question about my quote for ${quote.site_address || 'the job'}.`;
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+      '_blank', 'noopener,noreferrer');
   });
 }
 

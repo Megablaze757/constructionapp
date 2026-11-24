@@ -1730,7 +1730,7 @@ async function crewRoutes(path, request, env, ctxo) {
  * deletion: we name the fields that go out, so a new internal column (cost,
  * margin, an AI note to the owner) can never leak by being forgotten here.
  */
-function clientView(quote, lines, totals, photos = []) {
+function clientView(quote, lines, totals, photos = [], env = {}) {
   const pick = (l) => ({
     id: l.id,
     description: l.description,
@@ -1745,6 +1745,12 @@ function clientView(quote, lines, totals, photos = []) {
     client_name: quote.client_name,
     site_address: quote.site_address,
     job_type: quote.job_type,
+    // The business's own contact details, so a client with a question can reach
+    // a person. Deliberately the only outbound-contact field on this payload,
+    // and empty unless the owner has set it — the quote page hides the button
+    // rather than offering one that goes nowhere.
+    business_name: env.BUSINESS_NAME || '',
+    business_phone: env.BUSINESS_PHONE || '',
     // Deliberately NOT quote.description — that is the owner's dictated brief
     // ("right, this is the Elm Street job…"), which is working notes, not copy
     // to put in front of a paying client.
@@ -1785,7 +1791,7 @@ async function clientRoutes(path, request, env, ctxo) {
     }
     await db.logEvent(D1, row.id, 'opened', {});
     return json(
-      { quote: { ...clientView(loaded.quote, loaded.lines, loaded.totals, photos), expired } },
+      { quote: { ...clientView(loaded.quote, loaded.lines, loaded.totals, photos, env), expired } },
       ctxo,
     );
   }
@@ -1829,7 +1835,7 @@ async function clientRoutes(path, request, env, ctxo) {
     );
     await db.logEvent(D1, row.id, 'extra_toggled', { selected: [...ids] });
     const loaded = await db.loadQuote(D1, await db.getQuoteRow(D1, row.id));
-    return json({ quote: clientView(loaded.quote, loaded.lines, loaded.totals) }, ctxo);
+    return json({ quote: clientView(loaded.quote, loaded.lines, loaded.totals, [], env) }, ctxo);
   }
 
   if (action === 'accept' && request.method === 'POST') {

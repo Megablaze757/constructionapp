@@ -33,6 +33,7 @@ jobs:
           API_BASE: ${{ vars.API_BASE }}
           AI_BASE: ${{ vars.AI_BASE }}
           BUSINESS_NAME: ${{ vars.BUSINESS_NAME }}
+          BUSINESS_PHONE: ${{ vars.BUSINESS_PHONE }}
         run: |
           AI_BASE="${AI_BASE:-https://construction.fitnessguru.workers.dev}"
           {
@@ -40,6 +41,7 @@ jobs:
             echo "  apiBase: '${API_BASE}',"
             echo "  aiBase: '${AI_BASE}',"
             echo "  businessName: '${BUSINESS_NAME:-Builder Co.}',"
+            echo "  businessPhone: '${BUSINESS_PHONE}',"
             echo "};"
           } > web/config.js
           if [ -z "$API_BASE" ]; then

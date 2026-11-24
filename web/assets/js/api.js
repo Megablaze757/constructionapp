@@ -130,17 +130,17 @@ const BANNERS = {
   },
   unreachable: {
     tone: '#8a5a00',
-    text: '<strong>Running On-Device Mode.</strong> Cloud Server is connecting; quotes and jobs are safely stored on this device.',
+    text: '<strong>Running On-Device Mode.</strong> Cloud Sync could not be reached, so quotes and jobs are saved on this device only — client links and crew links will not open anywhere else.',
     action: null,
   },
   chosen: {
     tone: '#8a5a00',
-    text: '<strong>Running On-Device Mode</strong> by choice. Data is kept locally on this device.',
+    text: '<strong>Running On-Device Mode</strong> by choice. Everything is saved on this device only, so client links and crew links will not open anywhere else.',
     action: { label: 'Connect Cloud Sync', fn: () => useNetworkMode() },
   },
   down: {
     tone: '#9b1c1c',
-    text: '<strong>Cloud Sync Server Offline.</strong> Your data is saved on the cloud server. Reconnecting automatically when service resumes.',
+    text: '<strong>Cloud Sync Server Offline.</strong> Your data is on the cloud server, not this device, so nothing has been loaded. This is a connection problem, not lost work.',
     action: { label: 'Work On-Device instead', fn: () => useLocalMode() },
   },
 };

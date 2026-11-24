@@ -183,6 +183,9 @@ function renderAiSummary(summary) {
   if (summary.estimating_history?.length) {
     parts.push(`<div class="notice notice-warn"><strong>Learned from past jobs</strong><ul>${list(summary.estimating_history)}</ul></div>`);
   }
+  // What drafted this, and how sure it was. Without it the owner cannot tell a
+  // real estimate from a template default once the banner has been dismissed.
+  parts.push(`<p class="muted" style="margin:0">Drafted ${summary.ai === false ? 'from' : 'by'} ${esc(summary.model || 'AI')} · overall confidence ${esc(summary.confidence || '—')}</p>`);
   $('ai-summary-body').innerHTML = parts.join('');
 }
 
@@ -227,24 +230,78 @@ const formatQty = (n) => (Number.isInteger(Number(n)) ? String(n) : String(Numbe
 function renderExtras() {
   const container = $('extras');
   if (!container) return;
-  const extras = state.lines.filter((l) => l.is_extra);
-  container.innerHTML = extras.map((l) => `
+  const extras = state.lines.filter((l) => l.kind === 'extra');
+  container.innerHTML = extras.length
+    ? extras.map((l) => `
     <div class="extra">
-      <input type="checkbox" ${l.selected_by_client ? 'checked' : ''} disabled>
+      <input type="checkbox" ${l.selected ? 'checked' : ''} disabled>
       <div><strong>${esc(l.description)}</strong></div>
-      <div class="extra-price">${price(l.amount)}</div>
-      <div class="extra-blurb">${esc(l.quantity)} ${esc(l.unit)}</div>
+      <div class="extra-price">${price(l.line_price)}</div>
+      ${l.blurb ? `<div class="extra-blurb">${esc(l.blurb)}</div>` : ''}
     </div>
-  `).join('');
+  `).join('')
+    : '<div class="card-body muted">No optional extras on this template.</div>';
+}
+
+/**
+ * Where the cost actually goes, as a proportion of the quote's own cost.
+ *
+ * Priced off `line_cost` rather than `line_price`, because the question this
+ * answers is "what is this job made of" — a quote that is mostly plant hire is a
+ * different risk from one that is mostly your own labour.
+ */
+function renderCostSplit() {
+  const bars = { labour: $('bar-labour'), material: $('bar-material'), plant: $('bar-plant') };
+  if (!bars.labour) return;
+
+  const base = state.lines.filter((l) => l.kind !== 'extra');
+  const cost = base.reduce((t, l) => t + (Number(l.line_cost) || 0), 0);
+  const by = (cat) => base
+    .filter((l) => (cat === 'plant' ? l.category !== 'labour' && l.category !== 'material' : l.category === cat))
+    .reduce((t, l) => t + (Number(l.line_cost) || 0), 0);
+
+  for (const [cat, el] of Object.entries(bars)) {
+    const share = cost ? (by(cat) / cost) * 100 : 0;
+    el.style.width = `${share.toFixed(1)}%`;
+    el.title = `${titleCase(cat)} — ${price(by(cat))} of ${price(cost)}`;
+  }
 }
 
 function renderTotals() {
-  $('total').textContent = price(state.totals.total);
-  const m = state.totals.margin;
-  const badge = $('margin-badge');
-  badge.textContent = `${(m.pct * 100).toFixed(1)}% margin`;
-  badge.className = `badge ${m.ok ? 'badge-ok' : 'badge-bad'}`;
-  $('margin-line').textContent = `${price(m.amount)} (${(m.pct * 100).toFixed(1)}%)`;
+  const t = state.totals;
+  $('total').textContent = price(t.subtotal_price);
+
+  const cls = t.below_floor ? 'badge-bad' : t.meets_target ? 'badge-ok' : 'badge-warn';
+  const mark = t.below_floor ? '⛔' : t.meets_target ? '✅' : '⚠️';
+  $('margin-badge').className = `badge ${cls}`;
+  $('margin-badge').textContent = `${t.margin_pct}% ${mark}`;
+  $('margin-line').innerHTML =
+    `<span class="badge ${cls}">${t.margin_pct}% ${mark}</span> <span class="muted">target ${t.target_margin}% · floor ${t.margin_floor}%</span>`;
+  $('cost-split-margin').textContent = `${t.margin_pct}% margin`;
+
+  renderCostSplit();
+
+  const notes = [];
+  if (t.below_cost_lines?.length) {
+    notes.push(`<div class="notice notice-bad"><strong>Priced at or below cost</strong><ul>${t.below_cost_lines.map((d) => `<li>${esc(d)}</li>`).join('')}</ul></div>`);
+  }
+  for (const b of state.blockers) {
+    notes.push(`<div class="notice notice-${b.code === 'below_margin_floor' ? 'bad' : 'warn'}">${esc(b.message)}</div>`);
+  }
+  if (state.quote.override_reason) {
+    notes.push(`<div class="notice notice-warn"><strong>Margin override logged</strong>${esc(state.quote.override_reason)}</div>`);
+  }
+  $('blockers').innerHTML = notes.join('');
+
+  // The send gate. The API refuses these too (422) — this is so the owner can
+  // see what is holding the quote up instead of pressing Send and being told.
+  const sendBtn = $('send-btn');
+  const hard = state.blockers.filter((b) => !b.overridable);
+  sendBtn.disabled = state.quote.status === 'accepted' || hard.length > 0;
+  sendBtn.textContent =
+    state.quote.status === 'accepted' ? 'Accepted' :
+    hard.length ? hard[0].message :
+    state.quote.status === 'draft' ? 'Send Quote →' : 'Re-send Quote →';
 }
 
 /* ------------------------------------------------------------- AI drafting */
@@ -255,9 +312,7 @@ $('draft-btn')?.addEventListener('click', async (e) => {
 
   // Append plan text extracts if attached
   const planText = attachedPlans.filter((p) => p.text).map((p) => `[Attachment: ${p.name}]
-${p.text}`).join('
-
-');
+${p.text}`).join('\n\n');
   if (planText) {
     description = description ? `${description}
 
@@ -354,8 +409,35 @@ initSpeechRecognition();
 
 /* --------------------------------------------------- whatsapp & link share */
 
-function getPublicQuoteUrl() {
-  return `${location.origin}/quote.html?id=${encodeURIComponent(quoteId)}`;
+/**
+ * The link the client opens.
+ *
+ * It carries the quote's unguessable `public_token`, never the internal id — the
+ * client route only answers to the token, and an id in a message that gets
+ * forwarded is an internal handle leaving the building for nothing. The path is
+ * derived from this page rather than from the origin, because on GitHub Pages
+ * the app lives under /<repo>/ and an origin-rooted link lands on a 404.
+ */
+function publicQuoteUrl({ preview = false } = {}) {
+  const base = `${location.origin}${location.pathname.replace(/[^/]*$/, '')}quote.html`;
+  const token = state.quote?.public_token;
+  if (!token) return '';
+  return `${base}?t=${encodeURIComponent(token)}${preview ? '&preview=1' : ''}`;
+}
+
+/**
+ * A draft quote's public link answers 404 by design, so that it cannot be used
+ * to probe which tokens are real. Sharing one would send the client a dead
+ * link, so say so rather than letting them find out.
+ */
+function shareableUrl() {
+  if (state.quote?.status === 'draft') {
+    banner('warn', '<strong>Send the quote first.</strong> The client link only opens once the quote has been sent.');
+    return '';
+  }
+  const url = publicQuoteUrl();
+  if (!url) banner('bad', 'This quote has no client link yet.');
+  return url;
 }
 
 function shareQuoteWhatsApp() {
@@ -363,7 +445,8 @@ function shareQuoteWhatsApp() {
   const clientName = $('client_name')?.value.trim() || q?.client_name || '';
   const clientPhone = $('client_phone')?.value.trim() || q?.client_phone || '';
   const siteAddr = $('site_address')?.value.trim() || q?.site_address || '';
-  const quoteUrl = getPublicQuoteUrl();
+  const quoteUrl = shareableUrl();
+  if (!quoteUrl) return;
 
   const message = `Hi ${clientName ? clientName : 'there'}, here is your quote for ${siteAddr ? siteAddr : 'your job'}:
 ${quoteUrl}
@@ -382,7 +465,8 @@ Please review and let me know if you have any questions!`;
 }
 
 async function copyQuoteLink() {
-  const quoteUrl = getPublicQuoteUrl();
+  const quoteUrl = shareableUrl();
+  if (!quoteUrl) return;
   try {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       await navigator.clipboard.writeText(quoteUrl);
@@ -399,4 +483,209 @@ async function copyQuoteLink() {
 
 $('whatsapp-share-btn')?.addEventListener('click', shareQuoteWhatsApp);
 $('copy-link-btn')?.addEventListener('click', copyQuoteLink);
+
+/* ------------------------------------------------------------------ saving */
+
+/**
+ * Replace the line items wholesale. The server reprices every one from the
+ * price book on the way in, so nothing here sets money — it sends quantities
+ * and provenance and adopts whatever comes back.
+ */
+async function saveLines() {
+  try {
+    apply(await api.putLines(quoteId, state.lines.map((l) => ({
+      id: l.id,
+      line_code: l.line_code,
+      description: l.description,
+      quantity: l.quantity,
+      unit: l.unit,
+      unit_cost: l.unit_cost,
+      unit_price: l.unit_price,
+      kind: l.kind,
+      blurb: l.blurb,
+      selected: l.selected,
+      source: l.source,
+      confidence: l.confidence,
+      note: l.note,
+      confirmed: l.confirmed,
+      locked: l.locked,
+    }))));
+    clearBanner();
+  } catch (err) {
+    reportError(err);
+  }
+}
+
+/** The tap-to-confirm gate: the owner saying they have looked at this number. */
+async function confirmLine(id) {
+  const line = state.lines.find((l) => l.id === id);
+  if (!line) return;
+  line.confirmed = true;
+  await saveLines();
+}
+
+/** The header fields, as typed. Shared by Save Draft and Send. */
+async function saveHeader() {
+  const saved = await api.patchQuote(quoteId, {
+    client_name: $('client_name').value.trim(),
+    client_phone: $('client_phone')?.value.trim() || '',
+    site_address: $('site_address').value.trim(),
+    description: $('description').value,
+    client_summary: $('client_summary').value.trim(),
+  });
+  touched.clear();
+  return saved;
+}
+
+$('save-btn')?.addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  try {
+    apply(await saveHeader());
+    btn.textContent = 'Saved ✓';
+    setTimeout(() => (btn.textContent = 'Save Draft'), 1400);
+  } catch (err) {
+    reportError(err);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* -------------------------------------------------------- line item dialog */
+
+const lineDialog = $('line-dialog');
+let editingId = null;
+
+function openLineDialog(id) {
+  editingId = id;
+  const line = id ? state.lines.find((l) => l.id === id) : null;
+
+  $('line-dialog-title').textContent = line ? 'Edit line item' : 'Add line item';
+  $('line-code').innerHTML = state.priceBook
+    .map((p) => `<option value="${esc(p.code)}">${esc(p.description)} (per ${esc(p.unit)})</option>`)
+    .join('');
+  $('line-code').value = line?.line_code || state.priceBook[0]?.code || '';
+  $('line-desc').value = line?.description || '';
+  $('line-qty').value = line?.quantity ?? 1;
+  $('line-delete').hidden = !line;
+  updateLinePreview();
+  lineDialog.showModal();
+}
+
+function updateLinePreview() {
+  const entry = state.priceBook.find((p) => p.code === $('line-code').value);
+  const qty = Number($('line-qty').value) || 0;
+  $('line-unit').textContent = entry ? `(${entry.unit})` : '';
+  $('line-price-preview').textContent = entry
+    ? `${qty} × ${price(entry.unit_price)} = ${price(qty * entry.unit_price)}`
+    : '';
+}
+
+$('line-code')?.addEventListener('change', () => {
+  const entry = state.priceBook.find((p) => p.code === $('line-code').value);
+  if (entry && !$('line-desc').value.trim()) $('line-desc').value = entry.description;
+  updateLinePreview();
+});
+$('line-qty')?.addEventListener('input', updateLinePreview);
+
+lineDialog?.addEventListener('close', async () => {
+  const action = lineDialog.returnValue;
+  if (action === 'cancel') return;
+
+  if (action === 'delete') {
+    state.lines = state.lines.filter((l) => l.id !== editingId);
+    return saveLines();
+  }
+
+  const qty = Number($('line-qty').value);
+  if (!Number.isFinite(qty) || qty <= 0) return banner('bad', 'Quantity must be greater than zero.');
+
+  const entry = state.priceBook.find((p) => p.code === $('line-code').value);
+  const patch = {
+    line_code: entry?.code,
+    description: $('line-desc').value.trim() || entry?.description || 'Line item',
+    quantity: qty,
+    unit: entry?.unit || 'job',
+    // Editing is a confirmation: the owner has looked at this number.
+    confirmed: true,
+  };
+
+  if (editingId) {
+    const line = state.lines.find((l) => l.id === editingId);
+    Object.assign(line, patch, { source: line.source === 'ai_inferred' ? 'ai_inferred' : line.source });
+  } else {
+    state.lines.push({ ...patch, id: '', kind: 'base', source: 'owner_entered', confidence: 'high', selected: false, locked: false });
+  }
+  await saveLines();
+});
+
+$('add-line-btn')?.addEventListener('click', () => openLineDialog(null));
+
+/* ----------------------------------------------------------------- preview */
+
+$('preview-btn')?.addEventListener('click', () => {
+  window.open(publicQuoteUrl({ preview: true }), '_blank', 'noopener');
+});
+
+/* ----------------------------------------------------------------- sending */
+
+const overrideDialog = $('override-dialog');
+const sentDialog = $('sent-dialog');
+
+$('send-btn')?.addEventListener('click', () => trySend());
+
+async function trySend(overrideReason) {
+  const btn = $('send-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Sending…';
+  try {
+    // Send is the only button most owners press, so anything typed into the
+    // header goes with it — otherwise the client-facing summary they just wrote
+    // is silently dropped for want of a Save Draft.
+    await saveHeader();
+    const res = await api.send(quoteId, overrideReason);
+    const url = res.public_url?.startsWith('http')
+      ? res.public_url
+      : `${location.origin}${location.pathname.replace(/builder\.html$/, '')}quote.html?t=${res.token}`;
+    $('sent-link').value = url;
+    $('open-link').href = url;
+    sentDialog.showModal();
+    apply(await api.getQuote(quoteId));
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 422) {
+      const floor = (err.body.blockers || []).find((b) => b.code === 'below_margin_floor');
+      if (floor) {
+        $('override-detail').textContent = floor.message;
+        $('override-reason').value = '';
+        overrideDialog.showModal();
+      } else {
+        apply(await api.getQuote(quoteId));
+        banner('bad', `<strong>Not ready to send.</strong><ul>${(err.body.blockers || []).map((b) => `<li>${esc(b.message)}</li>`).join('')}</ul>`);
+      }
+    } else {
+      reportError(err);
+    }
+  } finally {
+    renderTotals();
+  }
+}
+
+overrideDialog?.addEventListener('close', () => {
+  if (overrideDialog.returnValue !== 'override') return;
+  const reason = $('override-reason').value.trim();
+  if (!reason) return banner('bad', 'A reason is required to send below the margin floor.');
+  trySend(reason);
+});
+
+$('copy-link')?.addEventListener('click', async (e) => {
+  try {
+    await navigator.clipboard.writeText($('sent-link').value);
+    e.currentTarget.textContent = 'Copied ✓';
+  } catch {
+    $('sent-link').select();
+    e.currentTarget.textContent = 'Press ⌘/Ctrl+C';
+  }
+});
+
+boot();
 
