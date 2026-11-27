@@ -93,6 +93,32 @@ self-contained file for exactly this: no build, no CLI, no database.
 `ALLOWED_ORIGINS` is what stops another site spending your key. `*` is accepted so
 a first deploy works before you know the Pages URL, but narrow it after that.
 
+> **Check it actually took.** `curl -sI -H 'Origin: https://<you>.github.io'
+> https://<worker>.workers.dev/health | grep -i access-control-allow-origin`
+> must echo your origin back. If it prints nothing, `ALLOWED_ORIGINS` is unset
+> and every browser call is blocked before it is made — which looks exactly like
+> the worker being down. This caught a worker that had been live and unusable
+> for weeks.
+
+### Keeping it in version control instead
+
+Pasting is the quickest way to get going, and the worst way to keep going: a
+worker configured only in a dashboard has its settings nowhere anyone can
+review. Once it is running, switch to deploying it from the repository:
+
+```bash
+cd worker
+# Set `name` in wrangler.ai.toml to the worker you already have, or you will
+# get a second one on a different URL.
+npm run deploy:ai
+```
+
+[`wrangler.ai.toml`](../worker/wrangler.ai.toml) holds the allowlist and the
+model choices, so a wrong one shows up in a diff. Its `[vars]` **replace** the
+plain variables set in the dashboard; secrets are untouched, so `GROQ_API_KEY`
+survives. Set `DEPLOY_AI_WORKER` to `true` as a repository variable to have CI
+do it on every push, alongside the API Worker.
+
 The file is generated from `worker/src/schema.js` and `worker/src/groq.js`, and CI
 fails if it drifts from them — so the guardrails in it are the same ones the full
 Worker enforces, not a simplified copy. To run it locally:

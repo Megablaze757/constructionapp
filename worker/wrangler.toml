@@ -6,10 +6,13 @@ compatibility_date = "2025-09-01"
 #   GROQ_API_KEY         your Groq key (console.groq.com/keys)
 #   OWNER_TOKEN          shared token the Quote Builder authenticates with
 [vars]
-# Comma-separated CORS allowlist. Replace with your GitHub Pages origin.
-ALLOWED_ORIGINS = "http://localhost:8788,http://127.0.0.1:8788"
-# Public base URL of the Pages site, used to build the client quote link.
-PUBLIC_APP_URL = "http://localhost:8788"
+# Comma-separated CORS allowlist. The Pages origin has to be here or the
+# published site cannot call this Worker at all — a browser blocks it before the
+# request is made, and the failure looks identical to the Worker being down.
+ALLOWED_ORIGINS = "https://megablaze757.github.io,http://localhost:8788,http://127.0.0.1:8788"
+# Public base URL of the Pages site, used to build the client quote link. It
+# includes the repository path, because that is where a project site lives.
+PUBLIC_APP_URL = "https://megablaze757.github.io/constructionapp"
 # Text drafting. Any Groq chat model that can hold to JSON mode.
 GROQ_MODEL = "llama-3.3-70b-versatile"
 # Used only when site photos are attached — the text model above cannot see.

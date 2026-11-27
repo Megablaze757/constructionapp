@@ -50,8 +50,24 @@ jobs:
           cache-dependency-path: worker/package-lock.json
       - run: npm ci
         working-directory: worker
-      - uses: cloudflare/wrangler-action@v3
+      - name: Deploy the API Worker
+        uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
+
+      # The AI worker is pasted into the dashboard to get started, which means
+      # its settings live only there — ours ran for weeks with no
+      # ALLOWED_ORIGINS, so every browser call was blocked by CORS and nothing
+      # in the repository could have shown it. Deploying it from here keeps the
+      # allowlist and model choices in version control. Its GROQ_API_KEY is a
+      # secret and is left exactly as it is.
+      - name: Deploy the AI worker
+        if: ${{ vars.DEPLOY_AI_WORKER == 'true' }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          command: deploy -c wrangler.ai.toml

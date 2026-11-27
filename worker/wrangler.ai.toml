@@ -1,0 +1,40 @@
+# The AI worker, as code.
+#
+#   npm run deploy:ai
+#
+# paste/ai-worker.js is designed to be pasted into the Cloudflare dashboard, and
+# that is still the quickest way to get it running — but a worker configured only
+# in a dashboard has its settings nowhere anyone can review. Ours sat live for
+# weeks with no ALLOWED_ORIGINS, so every browser call to it was blocked by CORS,
+# and nothing in the repository could have told you.
+#
+# Deploying from here fixes that: the allowlist and the model choices are version
+# controlled, and a wrong one shows up in a diff.
+#
+# Two things to know before running it:
+#   - `name` must match the worker you already have, or you will get a second
+#     one on a different URL.
+#   - [vars] below REPLACE the plain variables set in the dashboard. Secrets are
+#     untouched, so GROQ_API_KEY survives — set that one with
+#     `wrangler secret put GROQ_API_KEY -c wrangler.ai.toml`, or in the
+#     dashboard. It must never appear in this file.
+
+name = "construction"
+main = "paste/ai-worker.js"
+compatibility_date = "2025-09-01"
+
+# Secrets (never in this file):
+#   GROQ_API_KEY     your Groq key (console.groq.com/keys) — required
+#   AI_SHARED_TOKEN  optional; when set, callers must send it as a bearer token
+[vars]
+# Who may call this worker from a browser. This is the whole defence on a worker
+# holding a billable key, so keep it to your own origins — "*" lets anyone who
+# finds the URL spend your Groq allowance.
+ALLOWED_ORIGINS = "https://megablaze757.github.io,http://localhost:8788,http://127.0.0.1:8788"
+GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_VISION_MODEL = "meta-llama/llama-4-maverick-17b-128e-instruct"
+GROQ_TRANSCRIBE_MODEL = "whisper-large-v3-turbo"
+GROQ_TRANSCRIBE_LANGUAGE = "en"
+
+[observability]
+enabled = true
