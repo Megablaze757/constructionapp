@@ -7,7 +7,7 @@ const $ = (id) => document.getElementById(id);
 const quoteId = new URLSearchParams(location.search).get('id');
 
 let state = { quote: null, lines: [], totals: null, blockers: [], priceBook: [], template: null };
-let attachedPlans = []; // { name, type, mime, b64, text }
+let attachedPlans = []; // see plans.js: { name, kind, mime, text, images, pages, note }
 
 /* ---------------------------------------------------------------- banners */
 
@@ -115,9 +115,9 @@ function renderPlanGrid() {
   grid.innerHTML = attachedPlans.map((p, idx) => `
     <div class="plan-card">
       <button class="remove-btn" data-idx="${idx}" type="button" aria-label="Remove file">×</button>
-      <div class="file-icon">${p.mime?.includes('image') ? '🖼️' : '📄'}</div>
+      <div class="file-icon">${p.kind === 'plan' ? '📐' : '📄'}</div>
       <div class="file-name" title="${esc(p.name)}">${esc(p.name)}</div>
-      <div class="file-badge">${esc(p.type)}</div>
+      <div class="file-badge">${esc(p.kind === 'plan' ? 'plan' : 'document')}${p.note ? ` · ${esc(p.note)}` : ''}</div>
     </div>
   `).join('');
 
@@ -322,7 +322,10 @@ $('draft-btn')?.addEventListener('click', async (e) => {
   let description = $('description').value.trim();
 
   // Append plan text extracts if attached
-  const planText = attachedPlans.filter((p) => p.text).map((p) => `[Attachment: ${p.name}]
+  // Text that was really in the attachment — a quote's wording, a schedule of
+  // works, a title block. plans.js returns '' rather than binary residue when
+  // there is none, so an empty string here means the file genuinely had no text.
+  const planText = attachedPlans.filter((p) => p.text).map((p) => `[${p.kind === 'plan' ? 'Plan' : 'Document'}: ${p.name}]
 ${p.text}`).join('\n\n');
   if (planText) {
     description = description ? `${description}
@@ -340,10 +343,8 @@ ${planText}` : planText;
   try {
     // Send combined description and photo/plan image payloads
     const usePhotos = $('use-photos')?.checked ?? true;
-    const extraImages = attachedPlans.filter((p) => p.b64).map((p) => ({
-      mime: p.mime,
-      b64: p.b64,
-    }));
+    // A drawing is geometry, so every rendered page goes to the vision model.
+    const extraImages = attachedPlans.flatMap((p) => p.images || []);
 
     apply(await api.draft(quoteId, description, usePhotos, extraImages));
     banner('warn', {

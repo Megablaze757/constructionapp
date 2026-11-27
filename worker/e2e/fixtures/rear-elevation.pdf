@@ -1,0 +1,43 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 370 >>
+stream
+2 w 0 0 0 RG
+60 120 m 460 120 l S  60 120 m 60 520 l S  460 120 m 460 520 l S  60 520 m 460 520 l S
+60 250 m 460 250 l S
+60 380 m 460 380 l S
+100 120 m 100 520 l S
+160 120 m 160 520 l S
+220 120 m 220 520 l S
+280 120 m 280 520 l S
+340 120 m 340 520 l S
+400 120 m 400 520 l S
+BT /F1 8 Tf 60 90 Td (REAR ELEVATION  1:50  SHEET A-01) Tj ET
+BT /F1 8 Tf 60 70 Td (12.0m) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000662 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+732
+%%EOF

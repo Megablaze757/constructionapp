@@ -10,7 +10,7 @@
  * at all rather than merely load and then fail.
  */
 
-const CACHE = 'builderos-shell-v9';
+const CACHE = 'builderos-shell-v10';
 const SHELL = [
   './',
   './index.html',
@@ -46,6 +46,9 @@ const SHELL = [
   // Local mode: the database engine, the schema, and the Worker itself.
   './assets/vendor/sql-wasm.js',
   './assets/vendor/sql-wasm.wasm',
+  './assets/vendor/pdf.min.mjs',
+  './assets/vendor/pdf.worker.min.mjs',
+  './assets/js/plans.js',
   './assets/schema.sql',
   './assets/js/local/backend.js',
   './assets/js/local/d1.js',

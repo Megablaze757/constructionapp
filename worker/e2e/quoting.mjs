@@ -6,6 +6,8 @@
  */
 
 import { WEB, SHOTS, step, ok, bad, check, openBrowser, ownerPage, makePhoto, reportConsole, failureCount } from './lib.mjs';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 export default async function run() {
   const { browser, ctx, errors } = await openBrowser();
@@ -88,6 +90,44 @@ export default async function run() {
     `note did not explain the scaling: "${note}"`);
 
   await page.screenshot({ path: `${SHOTS}/quote-builder.png`, fullPage: true });
+
+  /* --------------------------------------------- plans and their own quote */
+
+  step('Attach a plan drawing and their own existing quote');
+  const fixture = (f) => fileURLToPath(new URL(`./fixtures/${f}`, import.meta.url));
+  const read = await page.evaluate(async (files) => {
+    const { processDocument } = await import('./assets/js/plans.js');
+    const out = [];
+    for (const [name, bytes] of files) {
+      const r = await processDocument(new File([new Uint8Array(bytes)], name, { type: 'application/pdf' }));
+      out.push({ name, kind: r.kind, text: r.text, images: r.images.length,
+        jpeg: r.images[0] ? atob(r.images[0].b64.slice(0, 4)).charCodeAt(0) === 0xFF : null });
+    }
+    return out;
+  }, [
+    ['their-quote.pdf', [...readFileSync(fixture('their-quote.pdf'))]],
+    ['rear-elevation.pdf', [...readFileSync(fixture('rear-elevation.pdf'))]],
+  ]);
+
+  const quoteDoc = read.find((r) => r.name === 'their-quote.pdf');
+  const planDoc = read.find((r) => r.name === 'rear-elevation.pdf');
+
+  // A typed quote has to come back as readable words. The old code returned
+  // stripped PDF binary here, which went to the model as if it were the quote.
+  check(quoteDoc.kind === 'document', 'their own quote reads as a document', `read as ${quoteDoc.kind}`);
+  check(/HIGGINS SCAFFOLDING/.test(quoteDoc.text) && /45 m2/.test(quoteDoc.text),
+    `real text extracted (${quoteDoc.text.length} chars, with the line items)`,
+    `text was not readable: ${JSON.stringify(quoteDoc.text.slice(0, 80))}`);
+  check(!/obj|endstream|\/Type\s*\//.test(quoteDoc.text),
+    'and it is words, not PDF internals', `PDF structure leaked into the text: ${quoteDoc.text.slice(0, 80)}`);
+  check(quoteDoc.images === 0, 'a typed document is not also photographed', 'wasted vision tokens on text');
+
+  // A drawing is geometry: it has to be rendered, or the model never sees it.
+  check(planDoc.kind === 'plan', 'the elevation reads as a plan', `read as ${planDoc.kind}`);
+  check(planDoc.images === 1 && planDoc.jpeg, 'and is rendered to a real JPEG for the vision model',
+    `images: ${planDoc.images}, jpeg: ${planDoc.jpeg}`);
+  check(/REAR ELEVATION/.test(planDoc.text), 'its title block text comes through too',
+    `title block missing: ${JSON.stringify(planDoc.text)}`);
 
   step('Confirm and send');
   await page.fill('#client_summary', 'Rear scaffold — 2 lifts, roofer access.');

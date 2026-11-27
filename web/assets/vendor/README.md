@@ -24,3 +24,29 @@ no request to a third party when someone opens the app.
 
 To upgrade: download both files at the new version, update the sizes and hashes
 above, and run `npm run e2e` in `worker/` — the local-mode journey exercises it.
+
+## pdf.js 6.5.438 — Apache-2.0
+
+`pdf.min.mjs` (474,284 bytes) and `pdf.worker.min.mjs` (1,271,915 bytes), copied
+verbatim from the published npm tarball:
+
+    https://cdn.jsdelivr.net/npm/pdfjs-dist@6.5.438/build/pdf.min.mjs
+    https://cdn.jsdelivr.net/npm/pdfjs-dist@6.5.438/build/pdf.worker.min.mjs
+
+    sha256  3a88402882cfa3e7e72c2c9b5149f52f0f88baf1c5b62aa11a41abdbc2072440  pdf.min.mjs
+    sha256  1e64c8240e54735ec5913b37acd5134747799cb8c6bb3777c70adbc01232d2aa  pdf.worker.min.mjs
+
+Mozilla's PDF reader. `assets/js/plans.js` uses it for the two things an
+attachment can be: `getTextContent()` pulls the real words out of a typed
+document — their own quote, a spec, a schedule of works — and `render()` draws a
+drawing to a canvas for the vision model, because an elevation is geometry
+rather than prose.
+
+Vendored rather than pulled from a CDN so a plan can be read on a site with no
+signal, which is where plans get read. The worker file is the larger of the two
+and does the parsing; it is loaded off the main thread so a big plan set does
+not freeze the page.
+
+To upgrade: download both files at the new version, update the sizes and hashes
+above, and run `npm run e2e` in `worker/` — the quoting journey reads a typed
+quote and a vector drawing and asserts what comes out of each.
