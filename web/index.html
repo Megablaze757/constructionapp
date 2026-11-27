@@ -40,13 +40,13 @@
   <div class="card">
     <h2>📄 Use your own quote</h2>
     <div class="card-body">
-      <p class="muted" style="margin:0">
+      <p class="muted">
         Upload a quote you have already sent and it becomes a template you can pick for
         future jobs — your wording, your line items, your rates. PDF, photo or text.
       </p>
       <input type="file" id="import-input" accept=".pdf,.txt,.csv,image/*" hidden>
       <button class="btn" id="import-btn" type="button">Upload a quote →</button>
-      <p class="muted" id="import-status" style="margin:0"></p>
+      <p class="muted" id="import-status"></p>
     </div>
   </div>
 
@@ -77,7 +77,7 @@
 <dialog id="settings-dialog">
   <form method="dialog" class="card-body">
     <h2>App &amp; Cloud Settings</h2>
-    <p class="muted" style="margin:0" id="mode-explainer"></p>
+    <p class="muted" id="mode-explainer"></p>
 
     <label>Cloud Server Endpoint
       <input type="text" id="api-base-display" placeholder="https://your-cloud-server.com" readonly>
@@ -86,8 +86,8 @@
       <input type="text" id="owner-token" placeholder="Enter your access passkey" autocomplete="off">
     </label>
 
-    <h2 style="margin-top:10px">AI Estimating Engine</h2>
-    <p class="muted" style="margin:0">
+    <h2>AI Estimating Engine</h2>
+    <p class="muted">
       Connect your AI estimation engine to enable instant blueprint plan parsing, auto-quoting from existing templates, and voice-to-quote conversion.
     </p>
     <label>AI Service Endpoint
@@ -98,20 +98,20 @@
     </label>
 
     <div id="backup-section" hidden>
-      <h2 style="margin-top:10px">Back up this device</h2>
-      <p class="muted" style="margin:0">
+      <h2>Back up this device</h2>
+      <p class="muted">
         Your quotes and jobs are stored in this browser only. Clearing site data deletes them.
         A backup is a plain SQLite file — keep it somewhere safe, and restore it here or on a new phone.
       </p>
-      <div class="btn-row" style="margin-top:8px">
+      <div class="btn-row">
         <button class="btn" id="backup-btn" type="button">⬇️ Download backup</button>
         <button class="btn" id="restore-btn" type="button">⬆️ Restore a backup</button>
       </div>
       <input type="file" id="restore-input" accept=".sqlite,.db,application/octet-stream" hidden>
-      <p class="muted" id="backup-status" style="margin:6px 0 0"></p>
+      <p class="muted" id="backup-status"></p>
     </div>
 
-    <div class="btn-row" style="margin-top: 12px;">
+    <div class="btn-row">
       <button class="btn" value="cancel" type="submit">Cancel</button>
       <button class="btn btn-primary" id="save-settings" value="save" type="submit">Save Settings</button>
     </div>
@@ -122,7 +122,7 @@
 <dialog id="import-dialog">
   <form method="dialog" class="card-body">
     <h2>Check this before it is saved</h2>
-    <p class="muted" style="margin:0" id="import-source"></p>
+    <p class="muted" id="import-source"></p>
 
     <div id="import-warnings"></div>
 
@@ -135,8 +135,8 @@
 
     <div class="import-lines" id="import-lines"></div>
 
-    <h2 style="margin-top:10px">What does this work cost you?</h2>
-    <p class="muted" style="margin:0">
+    <h2>What does this work cost you?</h2>
+    <p class="muted">
       Your quote shows what the client pays, not what the job costs you — so we cannot
       read it. Give your typical margin and we will work the costs back from your prices,
       or type each one in. Either way the margin gate needs it to mean anything.
@@ -144,9 +144,9 @@
     <label>Typical margin
       <input type="number" id="import-margin" min="0" max="99" step="1" value="30" inputmode="decimal">
     </label>
-    <p class="muted" id="import-cost-note" style="margin:0"></p>
+    <p class="muted" id="import-cost-note"></p>
 
-    <div class="btn-row" style="margin-top:12px">
+    <div class="btn-row">
       <button class="btn" value="cancel" type="submit">Cancel</button>
       <button class="btn btn-primary" value="save" type="submit">Save as my template</button>
     </div>

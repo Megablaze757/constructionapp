@@ -47,7 +47,7 @@
         <div class="dropzone-title">Drop plans or existing quote documents here</div>
         <div class="dropzone-sub">Upload PDF blueprints, architectural drawings, or previous quote templates (PDF, PNG, JPG, TXT, CSV)</div>
         <input type="file" id="plan-input" accept=".pdf,image/*,.txt,.csv,.md" multiple hidden>
-        <button class="btn btn-sm" id="plan-browse-btn" type="button" style="margin-top: 4px;">Browse files</button>
+        <button class="btn btn-sm" id="plan-browse-btn" type="button">Browse files</button>
       </div>
       <div class="plan-grid" id="plan-grid"></div>
     </div>
@@ -58,10 +58,10 @@
     <h2>🎙️ Describe the job</h2>
     <div class="card-body">
       <button class="btn btn-voice btn-record" id="record-btn" type="button">● Hold / Tap to speak quote</button>
-      <p class="muted" id="record-hint" style="margin:0">or type the description below</p>
+      <p class="muted" id="record-hint">or type the description below</p>
       <label class="sr-only" for="description">Job description</label>
       <textarea id="description" placeholder="Rear scaffold, 2 lifts, roofer access, up 5 days"></textarea>
-      <p class="muted" style="margin:0">Your own notes and the AI's input. The client never sees this.</p>
+      <p class="muted">Your own notes and the AI's input. The client never sees this.</p>
       <label class="inline-check" id="use-photos-row" hidden>
         <input type="checkbox" id="use-photos" checked>
         <span>Let the AI look at your site photos &amp; attached plans <span class="muted" id="photo-count"></span></span>
@@ -75,19 +75,19 @@
     <div class="card-body">
       <label class="sr-only" for="client_summary">Client-facing summary</label>
       <textarea id="client_summary" placeholder="Rear scaffold — 2 lifts. Includes erect, 5-day hire, dismantle, and roofer access."></textarea>
-      <p class="muted" style="margin:0">Plain language for the quote page. Leave blank to show just the scope list.</p>
+      <p class="muted">Plain language for the quote page. Leave blank to show just the scope list.</p>
     </div>
   </div>
 
   <!-- Site photos -->
   <div class="card">
-    <h2>Site photos <span class="muted" style="text-transform:none;letter-spacing:0">shown on the client quote</span></h2>
+    <h2>Site photos <span class="muted">shown on the client quote</span></h2>
     <div class="card-body">
       <div id="photo-grid"></div>
       <label class="sr-only" for="photo-input">Add site photos</label>
       <input type="file" id="photo-input" accept="image/*" multiple capture="environment" hidden>
       <button class="btn" id="photo-btn" type="button">📷 Add site photo</button>
-      <p class="muted" style="margin:0">Resized in your browser before upload, so it works on a weak site signal.</p>
+      <p class="muted">Resized in your browser before upload, so it works on a weak site signal.</p>
     </div>
   </div>
 
@@ -101,20 +101,20 @@
   <div class="card">
     <h2>Line items <span id="margin-badge" class="badge badge-ok">—</span></h2>
     <!-- Cost Allocation Visualizer -->
-    <div style="padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--surface-2);">
-      <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--ink-2); margin-bottom: 6px;">
+    <div class="cost-bar-wrap">
+      <div class="cost-bar-head">
         <span>Cost Breakdown</span>
         <span id="cost-split-margin">—</span>
       </div>
-      <div style="height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; display: flex;">
-        <div id="bar-labour" style="background: var(--brand); width: 0%; height: 100%; transition: width 0.3s ease;" title="Labour"></div>
-        <div id="bar-material" style="background: var(--ok); width: 0%; height: 100%; transition: width 0.3s ease;" title="Material"></div>
-        <div id="bar-plant" style="background: var(--warn); width: 0%; height: 100%; transition: width 0.3s ease;" title="Plant"></div>
+      <div class="cost-bar">
+        <div id="bar-labour" class="swatch-labour" title="Labour"></div>
+        <div id="bar-material" class="swatch-material" title="Material"></div>
+        <div id="bar-plant" class="swatch-plant" title="Plant"></div>
       </div>
-      <div style="display: flex; gap: 12px; font-size: 11px; font-weight: 600; margin-top: 6px; color: var(--ink-2);">
-        <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--brand);"></span> Labour</span>
-        <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--ok);"></span> Material</span>
-        <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--warn);"></span> Plant / Other</span>
+      <div class="legend">
+        <span class="legend-item"><span class="swatch swatch-labour"></span> Labour</span>
+        <span class="legend-item"><span class="swatch swatch-material"></span> Material</span>
+        <span class="legend-item"><span class="swatch swatch-plant"></span> Plant / Other</span>
       </div>
     </div>
     <div class="lines" id="lines"></div>
@@ -125,7 +125,7 @@
 
   <!-- Optional extras -->
   <div class="card">
-    <h2>Optional extras <span class="muted" style="text-transform:none;letter-spacing:0">client can toggle</span></h2>
+    <h2>Optional extras <span class="muted">client can toggle</span></h2>
     <div class="lines" id="extras"></div>
   </div>
 
@@ -146,9 +146,9 @@
 </div>
 
 <div class="actionbar">
-  <div class="inner" style="flex-direction: column; gap: 8px;">
+  <div class="inner">
     <button class="btn btn-whatsapp" id="whatsapp-share-btn" type="button">🟢 Send via WhatsApp</button>
-    <div class="btn-row" style="width: 100%;">
+    <div class="btn-row">
       <button class="btn" id="copy-link-btn" type="button">📋 Copy Link</button>
       <button class="btn" id="preview-btn" type="button">Preview as Client</button>
     </div>
@@ -169,7 +169,7 @@
     <label>Quantity <span class="muted" id="line-unit"></span>
       <input type="number" id="line-qty" min="0" step="any" inputmode="decimal">
     </label>
-    <p class="muted" id="line-price-preview" style="margin:0"></p>
+    <p class="muted" id="line-price-preview"></p>
     <div class="btn-row">
       <button class="btn" value="cancel" type="submit">Cancel</button>
       <button class="btn btn-primary" value="save" type="submit">Save</button>
@@ -182,11 +182,11 @@
 <dialog id="override-dialog">
   <form method="dialog" class="card-body">
     <h2>Below the margin floor</h2>
-    <p class="muted" id="override-detail" style="margin:0"></p>
+    <p class="muted" id="override-detail"></p>
     <label>Reason for sending anyway
       <textarea id="override-reason" placeholder="e.g. Repeat client, expect two follow-on jobs"></textarea>
     </label>
-    <p class="muted" style="margin:0">This reason is recorded against the quote.</p>
+    <p class="muted">This reason is recorded against the quote.</p>
     <div class="btn-row">
       <button class="btn" value="cancel" type="submit">Cancel</button>
       <button class="btn btn-primary" value="override" type="submit">Log &amp; send</button>
@@ -198,7 +198,7 @@
 <dialog id="sent-dialog">
   <form method="dialog" class="card-body">
     <h2>Quote sent</h2>
-    <p class="muted" style="margin:0">Share this link with the client:</p>
+    <p class="muted">Share this link with the client:</p>
     <input type="text" id="sent-link" readonly>
     <div class="btn-row">
       <button class="btn" id="copy-link" type="button">Copy link</button>

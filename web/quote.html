@@ -27,9 +27,9 @@
              so this stays hidden rather than showing a client a placeholder
              where their own property should be. -->
         <div class="photo" id="photo" hidden>📸</div>
-        <h2 style="font-size:18px;text-transform:none;letter-spacing:0;color:var(--ink);padding:0" id="job-title"></h2>
-        <p class="muted" id="job-summary" style="margin:0"></p>
-        <ul class="muted" id="scope" style="margin:0;padding-left:18px"></ul>
+        <h2 id="job-title"></h2>
+        <p class="muted" id="job-summary"></p>
+        <ul class="muted scope-list" id="scope"></ul>
         <div class="total-row">
           <span class="label">Base price</span>
           <span class="value" id="base-price">—</span>
@@ -55,9 +55,9 @@
 </div>
 
 <div class="actionbar" id="actions" hidden>
-  <div class="inner" style="flex-direction: column; gap: 8px;">
+  <div class="inner">
     <button class="btn btn-accept" id="accept-btn" type="button">✅ Accept &amp; Book Job</button>
-    <div class="btn-row" style="width: 100%;">
+    <div class="btn-row">
       <button class="btn btn-whatsapp" id="builder-wa-btn" type="button">💬 WhatsApp Builder</button>
       <button class="btn" id="ask-btn" type="button">Ask a Question</button>
     </div>
@@ -67,7 +67,7 @@
 <dialog id="ask-dialog">
   <form method="dialog" class="card-body">
     <h2>Ask a question</h2>
-    <p class="muted" style="margin:0">This goes straight to your builder.</p>
+    <p class="muted">This goes straight to your builder.</p>
     <label class="sr-only" for="ask-message">Your question</label>
     <textarea id="ask-message" placeholder="e.g. Could you start the week of the 12th?"></textarea>
     <div class="btn-row">
@@ -80,14 +80,14 @@
 <dialog id="confirm-dialog">
   <form method="dialog" class="card-body">
     <h2>Book &amp; Sign this job</h2>
-    <p class="muted" id="confirm-detail" style="margin:0"></p>
-    <label style="margin-top: 8px;">Draw your signature below:
-      <div style="border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface-2); margin-top: 4px;">
-        <canvas id="signature-canvas" width="380" height="120" style="touch-action: none; display: block; cursor: crosshair; width: 100%; height: 120px;"></canvas>
+    <p class="muted" id="confirm-detail"></p>
+    <label>Draw your signature below:
+      <div class="sig-frame">
+        <canvas id="signature-canvas" width="380" height="120" class="sig-canvas"></canvas>
       </div>
     </label>
-    <button class="btn btn-sm btn-ghost" id="clear-sig-btn" type="button" style="margin-top: 4px; width: fit-content;">Clear signature</button>
-    <div class="btn-row" style="margin-top: 12px;">
+    <button class="btn btn-sm btn-ghost" id="clear-sig-btn" type="button" data-fit>Clear signature</button>
+    <div class="btn-row">
       <button class="btn" value="cancel" type="submit">Not yet</button>
       <button class="btn btn-accept" value="accept" type="submit">Sign &amp; Book Job</button>
     </div>

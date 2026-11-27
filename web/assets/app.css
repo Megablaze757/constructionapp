@@ -1,106 +1,239 @@
-/* BuilderOS — World-Class Mobile-First Construction Operating System
-   Designed specifically for UK Trade Business Owners on-site.
-   Target: High contrast, 56px+ touch targets, zero clutter, daylight legibility. */
+/*
+ * BuilderOS — one stylesheet for every screen.
+ *
+ * This replaces a sheet that styled 31 classes while the markup used 93. Two
+ * thirds of the interface had no styles at all: the quote line items, the whole
+ * dashboard, the provenance tags the whole app is built around, the loading
+ * spinner, the success notice — and `.sr-only`, which meant labels written for
+ * screen readers were rendering on screen for everybody. The tests never caught
+ * it because they read text, not pixels.
+ *
+ * Two things shape the design, and both come from where it gets used:
+ *
+ * **It has to be readable outdoors.** A builder reads this on a phone, on a
+ * roof, in daylight. A dark navy app is unreadable in sun, so light is the
+ * default and dark is what you get when the phone asks for it. Contrast is
+ * deliberately higher than a desk app would need.
+ *
+ * **It gets used with gloves on.** Every control is at least --tap tall, there
+ * is real space between adjacent actions, and nothing important depends on
+ * hover, which a touchscreen does not have.
+ *
+ * Class names are a contract with the end-to-end suite and with the markup in
+ * eleven HTML files, so names are preserved exactly; what changed is that they
+ * now all do something.
+ */
 
 :root {
-  --bg: #0f172a;
-  --surface: #1e293b;
-  --surface-2: #334155;
-  --surface-3: #475569;
-  --line: #334155;
-  --line-light: #475569;
-  --ink: #f8fafc;
-  --ink-2: #94a3b8;
-  --ink-3: #64748b;
-  --brand: #2563eb;
-  --brand-hover: #1d4ed8;
-  --brand-light: rgba(37, 99, 235, 0.15);
-  --brand-ink: #ffffff;
-  --accent: #f59e0b;
-  --accent-light: rgba(245, 158, 11, 0.15);
-  --ok: #10b981;
-  --ok-bg: rgba(16, 185, 129, 0.15);
-  --warn: #f59e0b;
-  --warn-bg: rgba(245, 158, 11, 0.15);
-  --bad: #ef4444;
-  --bad-bg: rgba(239, 68, 68, 0.15);
-  --wa-green: #25d366;
-  --wa-hover: #1ebc57;
-  --radius: 16px;
+  /* Spacing. One scale, used everywhere, so gaps stop being decided per-element. */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+
+  /* Type. Site-legible: nothing below 13px, and body text at 16 so phones
+     do not zoom on focus. */
+  --t-xs: 12px;
+  --t-sm: 13px;
+  --t-base: 16px;
+  --t-lg: 19px;
+  --t-xl: 24px;
+  --t-2xl: 32px;
+
+  --radius: 14px;
   --radius-sm: 10px;
+  /* Minimum target for a gloved thumb. */
   --tap: 54px;
   /* Height of the fixed bottom nav, including the device's safe-area inset.
-     Anything else pinned to the bottom offsets by this so the two never
-     overlap — see .actionbar. */
+     Anything else pinned to the bottom offsets by this — see .actionbar. */
   --nav-h: calc(62px + env(safe-area-inset-bottom));
-  --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
-  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+
+  /* ---- Light: the default, because this is used outside ---- */
+  --bg: #f4f6f8;
+  --surface: #ffffff;
+  --surface-2: #eceff3;
+  --surface-3: #dde2e8;
+  --line: #d2d9e0;
+  --line-light: #bcc5ce;
+  --ink: #0f1a24;
+  --ink-2: #4a5a68;
+  --ink-3: #6b7b89;
+
+  --brand: #0b5fa5;
+  --brand-hover: #094b83;
+  --brand-light: rgba(11, 95, 165, .10);
+  --brand-ink: #ffffff;
+
+  --accent: #a8570a;
+  --accent-light: rgba(168, 87, 10, .12);
+
+  --ok: #1d6b4f;
+  --ok-bg: rgba(29, 107, 79, .10);
+  --warn: #8a5207;
+  --warn-bg: rgba(138, 82, 7, .12);
+  --bad: #b3261e;
+  --bad-bg: rgba(179, 38, 30, .10);
+
+  --wa-green: #128c4b;
+  --wa-hover: #0e7340;
+
+  --shadow: 0 1px 2px rgba(15, 26, 36, .06), 0 6px 16px -10px rgba(15, 26, 36, .22);
+  --shadow-lg: 0 2px 4px rgba(15, 26, 36, .08), 0 20px 40px -24px rgba(15, 26, 36, .35);
 }
 
-* {
-  box-sizing: border-box;
-  -webkit-tap-highlight-color: transparent;
+/* ---- Dark: when the device asks for it ---- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d141b;
+    --surface: #16202a;
+    --surface-2: #1e2a36;
+    --surface-3: #2a3845;
+    --line: #2a3845;
+    --line-light: #3b4c5b;
+    --ink: #eef3f7;
+    --ink-2: #a3b4c2;
+    --ink-3: #7b8c9a;
+
+    --brand: #4da3e0;
+    --brand-hover: #6fb6e8;
+    --brand-light: rgba(77, 163, 224, .16);
+    --brand-ink: #07121c;
+
+    --accent: #e0a055;
+    --accent-light: rgba(224, 160, 85, .16);
+
+    --ok: #5fc495;
+    --ok-bg: rgba(95, 196, 149, .14);
+    --warn: #e0a055;
+    --warn-bg: rgba(224, 160, 85, .14);
+    --bad: #f28b82;
+    --bad-bg: rgba(242, 139, 130, .14);
+
+    --wa-green: #25d366;
+    --wa-hover: #1ebc57;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 6px 16px -10px rgba(0, 0, 0, .7);
+    --shadow-lg: 0 2px 4px rgba(0, 0, 0, .5), 0 20px 40px -24px rgba(0, 0, 0, .8);
+  }
 }
 
-[hidden] {
-  display: none !important;
+:root[data-theme="dark"] {
+  --bg: #0d141b;
+  --surface: #16202a;
+  --surface-2: #1e2a36;
+  --surface-3: #2a3845;
+  --line: #2a3845;
+  --line-light: #3b4c5b;
+  --ink: #eef3f7;
+  --ink-2: #a3b4c2;
+  --ink-3: #7b8c9a;
+  --brand: #4da3e0;
+  --brand-hover: #6fb6e8;
+  --brand-light: rgba(77, 163, 224, .16);
+  --brand-ink: #07121c;
+  --accent: #e0a055;
+  --accent-light: rgba(224, 160, 85, .16);
+  --ok: #5fc495;
+  --ok-bg: rgba(95, 196, 149, .14);
+  --warn: #e0a055;
+  --warn-bg: rgba(224, 160, 85, .14);
+  --bad: #f28b82;
+  --bad-bg: rgba(242, 139, 130, .14);
+  --wa-green: #25d366;
+  --wa-hover: #1ebc57;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 6px 16px -10px rgba(0, 0, 0, .7);
+  --shadow-lg: 0 2px 4px rgba(0, 0, 0, .5), 0 20px 40px -24px rgba(0, 0, 0, .8);
 }
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* Beats any display rule a component sets, so toggling .hidden actually hides. */
+[hidden] { display: none !important; }
+
+html { -webkit-text-size-adjust: 100%; }
 
 body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
-  letter-spacing: -0.01em;
-  padding-bottom: 90px;
+  font: var(--t-base)/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-wrap: break-word;
 }
+
+/* One visible focus treatment for everything, since a missing one is invisible
+   until someone is relying on it. */
+:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+/* ============================================================== Layout */
 
 .shell {
   max-width: 680px;
   margin: 0 auto;
-  padding: 0 16px 120px 16px;
+  /* Clears the fixed bottom nav. Raised again below when an action bar is
+     also pinned down there. */
+  padding: 0 var(--s4) calc(var(--nav-h) + var(--s6));
 }
 
-/* ------------------------------------------------------------- Navigation */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
 
 .topbar {
-  position: sticky;
-  top: 0;
-  z-index: 30;
   display: flex;
   align-items: center;
+  gap: var(--s3);
   justify-content: space-between;
-  gap: 12px;
-  padding: 14px 16px;
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  padding: var(--s4) 0 var(--s3);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: var(--bg);
   border-bottom: 1px solid var(--line);
+  margin-bottom: var(--s4);
 }
 
 .topbar h1 {
-  font-size: 20px;
-  font-weight: 800;
   margin: 0;
-  flex: 1;
-  letter-spacing: -0.02em;
-  color: var(--ink);
+  font-size: var(--t-lg);
+  font-weight: 700;
+  letter-spacing: -.01em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .topbar .back {
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-sm);
-  color: var(--ink);
+  color: var(--brand);
   text-decoration: none;
-  font-size: 22px;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  font-weight: 600;
+  padding: var(--s2);
+  margin: calc(var(--s2) * -1);
 }
+
+.logo { font-size: var(--t-xl); line-height: 1; }
+
+/* ============================================================== Nav */
 
 .bottom-nav {
   position: fixed;
@@ -110,227 +243,577 @@ body {
   z-index: 50;
   box-sizing: border-box;
   height: var(--nav-h);
-  background: rgba(15, 23, 42, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--surface);
   border-top: 1px solid var(--line);
   display: flex;
   justify-content: space-around;
-  align-items: center;
-  padding: 10px 8px calc(10px + env(safe-area-inset-bottom));
+  align-items: stretch;
+  padding: var(--s1) var(--s2) calc(var(--s1) + env(safe-area-inset-bottom));
+  box-shadow: 0 -2px 12px -8px rgba(0, 0, 0, .4);
 }
 
 .bottom-nav a {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  color: var(--ink-2);
+  justify-content: center;
+  gap: 2px;
+  flex: 1;
+  color: var(--ink-3);
   text-decoration: none;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 6px 12px;
+  font-size: var(--t-xs);
+  font-weight: 600;
   border-radius: var(--radius-sm);
-  transition: all 0.2s ease;
+  min-width: 0;
 }
 
-.bottom-nav a.active,
-.bottom-nav a:hover {
-  color: var(--brand);
-  background: var(--brand-light);
-}
+.bottom-nav a.active { color: var(--brand); background: var(--brand-light); }
+.bottom-nav-icon { font-size: 21px; line-height: 1; }
 
-.bottom-nav-icon {
-  font-size: 20px;
-  line-height: 1;
-}
-
-/* ------------------------------------------------------------- Cards & Layout */
+/* ============================================================== Cards */
 
 .card {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  margin-top: 16px;
+  margin-bottom: var(--s4);
   box-shadow: var(--shadow);
   overflow: hidden;
 }
 
 .card > h2 {
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-2);
   margin: 0;
-  padding: 18px 18px 0;
+  padding: var(--s3) var(--s4);
+  font-size: var(--t-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ink-2);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--s2);
+  flex-wrap: wrap;
 }
 
 .card-body {
-  padding: 18px;
-  display: grid;
-  gap: 16px;
+  padding: var(--s4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
 }
 
-/* ------------------------------------------------------------- Form Inputs */
+/* ============================================================== Forms */
 
 label {
-  display: grid;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  font-size: var(--t-sm);
+  font-weight: 600;
   color: var(--ink-2);
 }
 
-input[type="text"],
-input[type="email"],
-input[type="tel"],
-input[type="number"],
-select,
-textarea {
-  width: 100%;
-  min-height: var(--tap);
-  padding: 14px 16px;
+input[type="text"], input[type="number"], input[type="tel"], input[type="email"],
+input[type="date"], input[type="password"], select, textarea {
+  font: inherit;
+  /* 16px minimum stops iOS zooming the page when a field is focused. */
+  font-size: var(--t-base);
   color: var(--ink);
-  background: var(--bg);
-  border: 1px solid var(--line);
+  background: var(--surface);
+  border: 1px solid var(--line-light);
   border-radius: var(--radius-sm);
-  font-size: 16px;
-  font-weight: 600;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  padding: var(--s3);
+  min-height: var(--tap);
+  width: 100%;
 }
 
-textarea {
-  min-height: 110px;
-  resize: vertical;
+textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
+
+input:disabled, select:disabled, textarea:disabled {
+  background: var(--surface-2);
+  color: var(--ink-3);
 }
 
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-button:focus-visible {
-  outline: none;
-  border-color: var(--brand);
-  box-shadow: 0 0 0 3px var(--brand-light);
+.inline-check {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--s2);
+  font-weight: 500;
+  color: var(--ink);
 }
 
-/* ------------------------------------------------------------- Buttons */
+.inline-check input[type="checkbox"] {
+  width: 24px;
+  height: 24px;
+  min-height: 0;
+  accent-color: var(--brand);
+  flex: none;
+}
+
+/* ============================================================== Buttons */
 
 .btn {
-  min-height: var(--tap);
-  padding: 14px 20px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
+  gap: var(--s2);
+  min-height: var(--tap);
+  padding: var(--s3) var(--s4);
+  font: inherit;
+  font-weight: 600;
   color: var(--ink);
-  font-size: 16px;
-  font-weight: 700;
+  background: var(--surface-2);
+  border: 1px solid var(--line-light);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   text-decoration: none;
-  width: 100%;
-  transition: all 0.2s ease;
+  text-align: center;
+  transition: background .15s ease;
 }
 
-.btn:hover:not(:disabled) {
-  background: var(--surface-3);
-}
+.btn:hover:not(:disabled) { background: var(--surface-3); }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
 
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+.btn-primary { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.btn-primary:hover:not(:disabled) { background: var(--brand-hover); }
 
-.btn-primary {
-  background: var(--brand);
-  border-color: var(--brand);
-  color: var(--brand-ink);
-  box-shadow: 0 4px 12px var(--brand-light);
-}
+.btn-accept { background: var(--ok); border-color: var(--ok); color: #fff; }
+.btn-danger { background: var(--bad); border-color: var(--bad); color: #fff; }
+.btn-ghost { background: transparent; border-color: transparent; color: var(--brand); }
 
-.btn-primary:hover:not(:disabled) {
-  background: var(--brand-hover);
-}
+.btn-whatsapp { background: var(--wa-green); border-color: var(--wa-green); color: #fff; }
+.btn-whatsapp:hover:not(:disabled) { background: var(--wa-hover); }
 
-.btn-whatsapp {
-  background: var(--wa-green);
-  border-color: var(--wa-green);
-  color: #ffffff;
-  font-weight: 800;
-  box-shadow: 0 4px 14px rgba(37, 211, 102, 0.35);
-}
+.btn-voice, .btn-record { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
 
-.btn-whatsapp:hover:not(:disabled) {
-  background: var(--wa-hover);
-}
-
-.btn-voice {
-  min-height: 62px;
-  font-size: 17px;
-  font-weight: 800;
-  background: linear-gradient(135deg, var(--surface-2), var(--surface-3));
-  border: 2px solid var(--brand);
-  color: var(--ink);
-}
-
-.btn-voice.recording {
-  background: var(--bad);
+.btn-voice.recording, .btn-record.recording {
+  background: var(--bad-bg);
   border-color: var(--bad);
-  color: #ffffff;
-  animation: pulse-ring 1.5s infinite;
+  color: var(--bad);
+  animation: pulse-ring 1.4s ease-in-out infinite;
 }
 
 @keyframes pulse-ring {
-  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-  70% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 var(--bad-bg); }
+  50% { box-shadow: 0 0 0 7px transparent; }
 }
 
-.btn-sm {
-  min-height: 42px;
-  padding: 8px 16px;
-  font-size: 14px;
-  width: auto;
-}
+.btn-sm { min-height: 40px; padding: var(--s2) var(--s3); font-size: var(--t-sm); }
 
-.btn-row {
-  display: flex;
-  gap: 10px;
-}
+.btn-row { display: flex; gap: var(--s2); flex-wrap: wrap; }
+.btn-row > .btn { flex: 1 1 auto; }
 
-/* ------------------------------------------------------------- Badges & Notices */
+/* ============================================================== Badges, tags */
 
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 800;
+  gap: 4px;
+  padding: 2px var(--s2);
+  border-radius: 999px;
+  font-size: var(--t-xs);
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
-.badge-ok { background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok); }
+.badge-ok   { background: var(--ok-bg);   color: var(--ok);   border: 1px solid var(--ok); }
 .badge-warn { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); }
-.badge-bad { background: var(--bad-bg); color: var(--bad); border: 1px solid var(--bad); }
+.badge-bad  { background: var(--bad-bg);  color: var(--bad);  border: 1px solid var(--bad); }
+
+/*
+ * A tag says where a number came from. This is the idea the quoting module is
+ * built on, so it is marked plainly rather than subtly: "the AI guessed this"
+ * and "you told me this" must not look alike at arm's length in the rain.
+ */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--s2);
+  border-radius: 999px;
+  font-size: var(--t-xs);
+  font-weight: 700;
+  background: var(--surface-3);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.tag-ai { background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent); }
+
+/* Amber dot: this line has not been looked at yet. */
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--warn);
+  border: 2px solid var(--warn-bg);
+  flex: none;
+}
+
+/* ============================================================== Notices */
 
 .notice {
-  padding: 14px;
+  padding: var(--s3);
   border-radius: var(--radius-sm);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.4;
+  font-size: var(--t-sm);
+  line-height: 1.5;
 }
-.notice-info { background: var(--brand-light); color: #60a5fa; border: 1px solid var(--brand); }
-.notice-warn { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); }
-.notice-bad { background: var(--bad-bg); color: var(--bad); border: 1px solid var(--bad); }
 
-/* ------------------------------------------------------------- Action Bar */
+.notice strong { display: block; margin-bottom: var(--s1); font-size: var(--t-base); }
+.notice ul { margin: var(--s2) 0 0; padding-left: var(--s4); display: grid; gap: var(--s1); }
+.notice code { font-size: .92em; word-break: break-word; }
+
+.notice-info { background: var(--brand-light); color: var(--ink); border: 1px solid var(--brand); }
+.notice-ok   { background: var(--ok-bg);   color: var(--ink); border: 1px solid var(--ok); }
+.notice-warn { background: var(--warn-bg); color: var(--ink); border: 1px solid var(--warn); }
+.notice-bad  { background: var(--bad-bg);  color: var(--ink); border: 1px solid var(--bad); }
+
+/* ============================================================== Line items */
+
+/*
+ * A quote line. The most looked-at thing in the app, and it had no styles: the
+ * description, price, quantity and note all stacked as plain text.
+ *
+ * Laid out as a grid so the money column stays aligned down the list — a column
+ * of prices that wanders is hard to scan, and scanning is what this list is for.
+ */
+.lines { display: flex; flex-direction: column; }
+
+.line {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "desc  price"
+    "qty   qty"
+    "note  note"
+    "acts  acts";
+  gap: var(--s1) var(--s3);
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--line);
+  align-items: start;
+}
+
+.line:last-child { border-bottom: 0; }
+
+/* Not yet confirmed: an amber edge, so a list of ten shows at a glance which
+   three still need an eye. */
+.line.unconfirmed { background: var(--warn-bg); box-shadow: inset 3px 0 0 var(--warn); }
+
+.line-desc {
+  grid-area: desc;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.line-price {
+  grid-area: price;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.line-qty {
+  grid-area: qty;
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The note is where the AI says what it inferred and what to check, so it is
+   readable rather than fine print. */
+.line-note {
+  grid-area: note;
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+  line-height: 1.45;
+  padding: var(--s1) 0;
+}
+
+.line-actions {
+  grid-area: acts;
+  display: flex;
+  gap: var(--s2);
+  flex-wrap: wrap;
+  margin-top: var(--s1);
+}
+
+/* ============================================================== Totals */
+
+.total-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+
+.total-row .label { font-size: var(--t-sm); color: var(--ink-2); font-weight: 600; }
+
+.total-row .value {
+  font-size: var(--t-xl);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+}
+
+/* ============================================================== Dashboard */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px;
+  background: var(--line);
+}
+
+.tile {
+  background: var(--surface);
+  padding: var(--s3) var(--s4) var(--s4);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tile-label {
+  font-size: var(--t-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ink-3);
+}
+
+.tile-value {
+  font-size: var(--t-2xl);
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+}
+
+.tile-sub { font-size: var(--t-sm); color: var(--ink-2); line-height: 1.4; }
+
+/* Severity on the tile itself, so what needs attention reads before the number
+   is even parsed. */
+.tile.ok   .tile-value { color: var(--ok); }
+.tile.warn .tile-value { color: var(--warn); }
+.tile.bad  .tile-value { color: var(--bad); }
+
+/* ============================================================== Client quote */
+
+.extra {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas:
+    "check name  price"
+    ".     blurb blurb";
+  gap: var(--s1) var(--s3);
+  align-items: center;
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--line);
+}
+
+.extra:last-child { border-bottom: 0; }
+.extra input[type="checkbox"] { grid-area: check; width: 26px; height: 26px; accent-color: var(--brand); }
+.extra > div:nth-of-type(1) { grid-area: name; min-width: 0; }
+.extra-price { grid-area: price; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.extra-blurb { grid-area: blurb; font-size: var(--t-sm); color: var(--ink-2); }
+
+.client-head { display: flex; flex-direction: column; gap: var(--s1); }
+
+/* ============================================================== Photos, plans */
+
+.photo-grid, .plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: var(--s2);
+}
+
+.photo-thumb, .plan-card {
+  position: relative;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.photo-thumb img, .photo img {
+  display: block;
+  width: 100%;
+  height: 104px;
+  object-fit: cover;
+}
+
+/* One photo gets the room to actually be looked at; a grid of them does not. */
+.photo-multi img { height: 104px; }
+#photos:not(.photo-multi) img { height: auto; max-height: 340px; object-fit: contain; }
+
+.plan-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s1);
+  padding: var(--s3) var(--s2);
+  text-align: center;
+}
+
+.file-icon { font-size: 26px; line-height: 1; }
+.file-name { font-size: var(--t-xs); font-weight: 600; word-break: break-word; }
+.file-badge { font-size: 11px; color: var(--ink-3); }
+
+.remove-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--bad);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.dropzone {
+  border: 2px dashed var(--line-light);
+  border-radius: var(--radius);
+  padding: var(--s5) var(--s4);
+  text-align: center;
+  cursor: pointer;
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s1);
+}
+
+.dropzone.dragover { border-color: var(--brand); background: var(--brand-light); }
+.dropzone-icon { font-size: 30px; line-height: 1; }
+.dropzone-title { font-weight: 700; }
+.dropzone-sub { font-size: var(--t-sm); color: var(--ink-2); }
+
+/* ============================================================== Cash */
+
+.aging { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 1px; background: var(--line); }
+
+.aging-cell {
+  background: var(--surface);
+  padding: var(--s3) var(--s2);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.aging-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); }
+.aging-amount { font-weight: 700; font-variant-numeric: tabular-nums; }
+.aging-cell.is-late .aging-amount { color: var(--bad); }
+
+.bucket { font-size: var(--t-sm); color: var(--ink-2); }
+
+/* ============================================================== Jobs, SOPs */
+
+.progress {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.progress > span { display: block; height: 100%; background: var(--ok); }
+
+.sop-steps { display: flex; flex-direction: column; gap: var(--s1); }
+
+.sop-check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s2);
+  padding: var(--s2);
+  border-radius: var(--radius-sm);
+  min-height: 44px;
+  font-size: var(--t-sm);
+}
+
+/* A step that needs photo proof and has not got it: not done, and shown as not
+   done, because a ticked box with no photo is the failure this guards against. */
+.sop-check.awaiting { background: var(--warn-bg); box-shadow: inset 3px 0 0 var(--warn); }
+.sop-check input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--ok); flex: none; margin-top: 1px; }
+.sop-detail { font-size: var(--t-xs); color: var(--ink-2); }
+
+.meta { font-size: var(--t-sm); color: var(--ink-2); display: flex; gap: var(--s3); flex-wrap: wrap; }
+.who { font-weight: 600; }
+
+.status { font-size: var(--t-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); }
+.status-sent { color: var(--brand); }
+
+.quote-row, .quote-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--line);
+  text-decoration: none;
+  color: inherit;
+}
+
+.quote-row:last-child, .quote-item:last-child { border-bottom: 0; }
+
+/* ============================================================== PIN login */
+
+.pin-display { display: flex; gap: var(--s3); justify-content: center; padding: var(--s4) 0; }
+
+.pin-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--line-light);
+}
+
+.pin-dot.filled { background: var(--brand); border-color: var(--brand); }
+
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); }
+
+.keypad-btn {
+  min-height: 64px;
+  font: inherit;
+  font-size: var(--t-xl);
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line-light);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.keypad-btn:active { background: var(--surface-3); }
+
+/* ============================================================== Misc */
+
+.muted { color: var(--ink-2); font-size: var(--t-sm); line-height: 1.5; }
+
+.spinner {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  vertical-align: -2px;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============================================================== Action bar */
 
 .actionbar {
   position: fixed;
@@ -338,10 +821,18 @@ button:focus-visible {
   left: 0;
   right: 0;
   z-index: 45;
-  background: rgba(15, 23, 42, 0.95);
-  backdrop-filter: blur(20px);
+  background: var(--surface);
   border-top: 1px solid var(--line);
-  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  padding: var(--s3) var(--s4) calc(var(--s3) + env(safe-area-inset-bottom));
+  box-shadow: 0 -4px 20px -12px rgba(0, 0, 0, .5);
+}
+
+.actionbar .inner {
+  max-width: 680px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
 }
 
 /*
@@ -350,42 +841,46 @@ button:focus-visible {
  * dead button under a thumb, not a z-index detail — and the safe-area inset
  * belongs to whichever bar is actually against the edge of the screen.
  */
-body:has(.bottom-nav) .actionbar {
-  bottom: var(--nav-h);
-  padding-bottom: 12px;
-}
-
-body:has(.bottom-nav):has(.actionbar) .shell {
-  padding-bottom: calc(var(--nav-h) + 140px);
-}
-
-.actionbar .inner {
-  max-width: 680px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.muted {
-  color: var(--ink-2);
-  font-size: 13px;
-}
-
-/* Desktop & Tablet Breakpoints */
-@media (min-width: 768px) {
-  .shell { padding-top: 20px; }
-  .card-body { padding: 24px; }
-  .actionbar .inner { flex-direction: row; align-items: center; justify-content: space-between; }
-}
-
-/* ------------------------------------------- Importing their own quote */
+body:has(.bottom-nav) .actionbar { bottom: var(--nav-h); padding-bottom: var(--s3); }
 
 /*
- * The review table. Built on .line so an imported row reads the same as a quote
- * row — same amber dot for "needs your eye", same note underneath — but with the
- * figures editable, because this is the one place the owner is correcting what
- * was read rather than confirming what was drafted.
+ * Clearance for the bars. Generous on purpose: the quote builder's action bar
+ * stacks three rows on a narrow phone, and a last line item sitting under it is
+ * one the owner scrolls past without confirming.
+ */
+body:has(.bottom-nav):has(.actionbar) .shell { padding-bottom: calc(var(--nav-h) + 250px); }
+body:not(:has(.bottom-nav)):has(.actionbar) .shell { padding-bottom: 260px; }
+
+@media (min-width: 768px) {
+  /* One row once there is width for it. */
+  body:has(.bottom-nav):has(.actionbar) .shell { padding-bottom: calc(var(--nav-h) + 130px); }
+  body:not(:has(.bottom-nav)):has(.actionbar) .shell { padding-bottom: 140px; }
+}
+
+/* ============================================================== Dialogs */
+
+dialog {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0;
+  width: min(560px, calc(100vw - var(--s5)));
+  max-height: 88vh;
+  box-shadow: var(--shadow-lg);
+}
+
+dialog::backdrop { background: rgba(0, 0, 0, .55); }
+dialog > form { max-height: 86vh; overflow-y: auto; }
+dialog h2 { margin: 0; font-size: var(--t-lg); }
+
+/* ============================================================== Import review */
+
+/*
+ * Built on .line so an imported row reads the same as a quote row — same amber
+ * edge for "needs your eye", same note underneath — but with the figures
+ * editable, because this is the one place the owner is correcting what was read
+ * rather than confirming what was drafted.
  */
 .import-lines {
   display: flex;
@@ -395,30 +890,116 @@ body:has(.bottom-nav):has(.actionbar) .shell {
   overflow: hidden;
 }
 
-.import-lines .line {
-  border-bottom: 1px solid var(--line);
-}
+.import-lines .line { border-bottom: 1px solid var(--line); }
 .import-lines .line:last-child { border-bottom: 0; }
 
 .import-lines input {
-  background: var(--surface-2);
+  background: var(--surface);
   border: 1px solid var(--line-light);
-  color: var(--ink);
-  border-radius: 6px;
-  padding: 6px 8px;
-  font: inherit;
-  min-height: 38px;
+  border-radius: 8px;
+  padding: var(--s2);
+  min-height: 44px;
+  font-size: var(--t-base);
 }
 
 .import-lines .import-desc { width: 100%; font-weight: 600; }
 .import-lines .import-qty { width: 5.5em; }
 .import-lines .import-price { width: 6.5em; }
+.import-lines .line-qty { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.import-lines .line-note { font-size: var(--t-xs); }
 
-.import-lines .line-qty {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+/* ============================================================== Wider screens */
+
+@media (min-width: 768px) {
+  .shell { padding-top: var(--s2); }
+  .card-body { padding: var(--s5); }
+  .actionbar .inner { flex-direction: row; align-items: center; justify-content: flex-end; }
+  .actionbar .inner > .btn { flex: 0 1 auto; }
+  .actionbar .inner > .btn-row { flex: 0 1 auto; }
+  .line { grid-template-columns: 1fr auto auto; grid-template-areas: "desc qty price" "note note note" "acts acts acts"; align-items: center; }
+  .line-qty { text-align: right; padding-right: var(--s3); }
 }
 
-.import-lines .line-note { font-size: 12px; }
+/* ============================================================== Resets that
+ * remove the need for inline styles.
+ *
+ * Twenty-six elements carried style="margin:0" because a card lays its children
+ * out with gap and a browser's default paragraph margin fights that. Fixing it
+ * once here is what stops the next element needing its own exception.
+ */
+
+.card-body > p,
+.card-body > ul,
+.card-body > ol,
+.card-body > h3,
+dialog form > p,
+dialog form > h2 { margin: 0; }
+
+/* A card heading is uppercase; an aside inside it is not. */
+.card > h2 .muted,
+.card > h2 small { text-transform: none; letter-spacing: 0; font-weight: 600; }
+
+/* ---- Cost breakdown: what the job is made of ---- */
+
+.cost-bar-wrap {
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.cost-bar-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s3);
+  font-size: var(--t-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--ink-2);
+}
+
+.cost-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+  display: flex;
+}
+
+.cost-bar > div { height: 100%; transition: width .3s ease; }
+
+.legend { display: flex; gap: var(--s3); flex-wrap: wrap; font-size: var(--t-xs); font-weight: 600; color: var(--ink-2); }
+.legend-item { display: flex; align-items: center; gap: var(--s1); }
+
+.swatch { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.swatch-labour { background: var(--brand); }
+.swatch-material { background: var(--ok); }
+.swatch-plant { background: var(--warn); }
+
+/* ---- Client quote: the signature pad ---- */
+
+.sig-canvas {
+  touch-action: none;
+  display: block;
+  cursor: crosshair;
+  width: 100%;
+  height: 120px;
+  background: var(--surface);
+  border: 1px solid var(--line-light);
+  border-radius: var(--radius-sm);
+}
+
+/* ---- Centred states: empty screens, the PIN login ---- */
+
+.centred { text-align: center; }
+.full { width: 100%; }
+
+.topbar-centred { justify-content: center; }
+.keypad-btn[data-primary] { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.keypad-btn[data-key="clear"], .keypad-btn[data-primary] { font-size: var(--t-base); }
+.scope-list { margin: 0; padding-left: var(--s4); display: grid; gap: var(--s1); }
+.sig-frame { border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; background: var(--surface-2); }
+.btn[data-fit] { flex: 0 0 auto; width: fit-content; }
