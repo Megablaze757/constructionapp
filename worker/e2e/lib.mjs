@@ -55,13 +55,19 @@ export function resetDatabase() {
   execFileSync('npm', ['run', 'db:local'], { cwd: WORKER_DIR, stdio: 'ignore' });
 }
 
-export async function openBrowser({ width = 420, height = 1100 } = {}) {
+export async function openBrowser({ width = 420, height = 1100, args = [], permissions } = {}) {
   // In CI Playwright installs its own browser; locally CHROMIUM_PATH points at
-  // whatever is already on the machine.
-  const browser = await chromium.launch(
-    process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
-  );
-  const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+  // whatever is already on the machine. `args` is for journeys that need a
+  // staged device — a fake microphone, say.
+  const browser = await chromium.launch({
+    ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
+    ...(args.length ? { args } : {}),
+  });
+  const ctx = await browser.newContext({
+    viewport: { width, height },
+    deviceScaleFactor: 1,
+    ...(permissions ? { permissions } : {}),
+  });
   const errors = [];
   ctx.on('weberror', (e) => errors.push(String(e.error())));
   return { browser, ctx, errors };

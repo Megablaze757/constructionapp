@@ -346,7 +346,21 @@ Drafting has three routes to a model, chosen by configuration and reported on
 | --- | --- | --- |
 | `groq` | `GROQ_API_KEY` is set | the assistant, as specified above |
 | `proxy` | `AI_PROXY_URL` is set | the same, through a Worker that holds the key — validated again on this side, so the proxy is trusted with the key and not with the contract |
-| `template` | neither | the job template's own default quantities |
+| `rules` | neither, and the description contains a usable figure | quantities read by pattern from the wording |
+| `template` | neither, and it does not | the job template's own default quantities |
+
+The `rules` rung (`src/rule-draft.js`) assigns a quantity only when it read that
+number in a unit the price book actually uses, and only when the unit identifies
+one line unambiguously. Everything else — "two lifts", a figure that could belong
+to either of two m² lines — becomes a flag for the owner instead of a number on a
+quote. It is pattern matching, labelled as pattern matching.
+
+Why not a small language model in the browser instead? Because it was measured:
+Qwen2.5-0.5B-Instruct q4 ran at 0.8 tokens/second (3¼ minutes per draft) and its
+output failed `validateDraft` outright — it swapped the two numbers, invented a
+unit of "building", and tagged both quantities `explicit_in_description` at high
+confidence. Speed can be fixed with a GPU most site phones do not have; that
+cannot.
 
 The template route exists so the module works before any infrastructure does, and
 its whole value depends on it never being mistaken for an estimate. Every line comes

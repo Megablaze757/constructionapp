@@ -17,6 +17,11 @@ GROQ_VISION_MODEL = "meta-llama/llama-4-maverick-17b-128e-instruct"
 # "auto" tries json_schema and falls back to json_object on models that do not
 # serve it. Force one with "json_schema" or "json_object" if you prefer.
 GROQ_STRUCTURED_OUTPUTS = "auto"
+# Speech to text for voice notes. Turbo is ~3x cheaper than whisper-large-v3 at
+# a small accuracy cost; both are multilingual.
+GROQ_TRANSCRIBE_MODEL = "whisper-large-v3-turbo"
+# Naming the language stops Whisper guessing it from a short, noisy site clip.
+GROQ_TRANSCRIBE_LANGUAGE = "en"
 # Name used in automated messages to clients.
 BUSINESS_NAME = "Builder Co."
 # Your WhatsApp number in international format, no spaces or +, e.g. "447700900123".

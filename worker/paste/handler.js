@@ -8,7 +8,7 @@
  * spelled out here rather than pulled from src/http.js.
  */
 
-import { requestDraft, modelFor } from '../src/groq.js';
+import { requestDraft, modelFor, transcribe, transcribeModelFor } from '../src/groq.js';
 
 /**
  * Browsers send the draft directly from the quote builder, so the allowlist is
@@ -44,6 +44,67 @@ function reply(body, status, headers) {
   });
 }
 
+/**
+ * Voice note in, text out.
+ *
+ * Separate from /draft because it is a different kind of request — multipart
+ * audio rather than JSON — and because a build that has transcription working
+ * and drafting broken, or the reverse, should be diagnosable as such.
+ */
+async function transcribeRoute(request, env, headers) {
+  if (request.method !== 'POST') return reply({ error: 'POST only' }, 405, headers);
+  if (env.AI_SHARED_TOKEN
+      && request.headers.get('Authorization') !== `Bearer ${env.AI_SHARED_TOKEN}`) {
+    return reply({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  let audio;
+  let vocabulary = '';
+  try {
+    const form = await request.formData();
+    audio = form.get('audio') || form.get('file');
+    vocabulary = String(form.get('vocabulary') || '');
+  } catch {
+    return reply({ error: 'Send the recording as multipart/form-data' }, 400, headers);
+  }
+  if (!audio || typeof audio === 'string') {
+    return reply({ error: 'An "audio" file part is required' }, 400, headers);
+  }
+  // Groq's own ceiling is 25MB; refusing here saves the upload.
+  if (audio.size > 24 * 1024 * 1024) {
+    return reply({ error: 'That recording is too large. Keep voice notes under about 20 minutes.' }, 413, headers);
+  }
+
+  const result = await transcribe(env, {
+    audio,
+    filename: audio.name || 'note.webm',
+    vocabulary: vocabulary || TRADE_VOCABULARY,
+  });
+
+  if (!result.ok) {
+    return reply(
+      { ok: false, error: result.error, detail: result.detail },
+      result.unconfigured ? 503 : 502,
+      headers,
+    );
+  }
+  return reply(result, 200, headers);
+}
+
+/**
+ * Primed vocabulary for the transcriber. Whisper takes up to 224 tokens of
+ * context, and these are the words a general recogniser turns into nonsense —
+ * "soffit" into "soft it", "m²" into "em two".
+ */
+const TRADE_VOCABULARY = [
+  'Scaffolding and roofing job notes.',
+  'Terms: lift, lifts, bay, standard, ledger, transom, tie, ties, boards, toe board,',
+  'guardrail, debris netting, sheeting, hop-up, birdcage, cantilever, dismantle,',
+  'fascia, soffit, bargeboard, verge, ridge, hip, valley, batten, felt, underlay,',
+  'tile, slate, strip, re-tile, gutter, downpipe, flashing, lead, scaffold hire.',
+  'Units: m2, square metres, linear metres, days, weeks, lifts, bays.',
+].join(' ');
+
 export default {
   async fetch(request, env) {
     const headers = cors(env, request);
@@ -59,9 +120,11 @@ export default {
         ai: !!env.GROQ_API_KEY,
         model: modelFor(env),
         vision_model: modelFor(env, { withPhotos: true }),
+        transcribe_model: transcribeModelFor(env),
       }, 200, headers);
     }
 
+    if (pathname === '/transcribe') return transcribeRoute(request, env, headers);
     if (pathname !== '/draft') return reply({ error: 'Not found' }, 404, headers);
     if (request.method !== 'POST') return reply({ error: 'POST only' }, 405, headers);
 

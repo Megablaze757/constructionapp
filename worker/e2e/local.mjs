@@ -50,9 +50,14 @@ export default async function run() {
     `lines claimed AI provenance with no AI connected: ${JSON.stringify(tags)}`);
 
   const summary = await page.textContent('#ai-summary-body');
-  check(/no AI is connected|not read/i.test(summary),
-    'the summary states the description was never read',
-    `summary did not disclose it: ${summary.replace(/\s+/g, ' ').slice(0, 160)}`);
+  // With no AI, drafting drops to the description parser. It must say that it
+  // was pattern matching rather than an estimate, whichever rung it landed on.
+  check(/not by AI|was not read/i.test(summary),
+    'the summary says no AI read the job',
+    `summary did not disclose it: ${summary.replace(/\s+/g, ' ').slice(0, 200)}`);
+  check(/matched by pattern, not estimated/i.test(summary),
+    'and that nothing estimated it',
+    `no pattern-matching disclosure: ${summary.replace(/\s+/g, ' ').slice(0, 200)}`);
 
   check(await page.locator('#send-btn').isDisabled(),
     'and every line still has to be confirmed before it can go out',

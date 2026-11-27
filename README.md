@@ -102,6 +102,38 @@ CI fails on a diff.
 | `automations.html` | Rules, the outbox, and a preview of what would happen |
 | `crew.html` | Field-facing: a crew member's own jobs, tasks and checklists, opened by a personal link |
 
+## Nothing is a single point of failure
+
+Both AI features are ladders. Each rung works on its own, and the app always
+says which one answered — an owner must never have to guess whether anything
+actually read the job.
+
+**Drafting a quote**
+
+| Rung | Needs | Gives |
+| --- | --- | --- |
+| Groq | a key, or the AI worker | a real estimate, with provenance per line |
+| The description parser | nothing | figures stated in a unit the price book uses; the rest flagged |
+| Template defaults | nothing | the template's own numbers, every line marked for checking |
+
+**Voice notes**
+
+| Rung | Needs | Gives |
+| --- | --- | --- |
+| Groq Whisper | the AI worker | best accuracy, ~0.05p a minute, primed with trade vocabulary |
+| Whisper on the device | nothing after a one-off 41MB model download | ~3x faster than real-time on CPU, offline, free |
+
+Measured on a machine with no GPU and no cross-origin isolation headers — the
+same constraints GitHub Pages imposes: the model is ready about 5s after
+download, and 11 seconds of speech transcribes in 3.6s.
+
+The parser rung exists because the obvious alternative does not work. A language
+model small enough to run in a phone browser was measured at 0.8 tokens/second —
+3¼ minutes for one draft — and its output was rejected outright by this repo's
+own contract validator. Asked about "two lifts… about five days" it returned
+`scaffold_erect: 5 building`, having swapped both numbers and invented the unit.
+Pattern matching is less clever and does not do that.
+
 ## The rule the quoting module is built around
 
 The AI drafts; it never prices and never sends. It returns quantities and honest
@@ -114,11 +146,17 @@ Those are enforced in the API, not just the UI, so skipping the app doesn't skip
 gate — and they are enforced again on this side of a proxy, so trusting something
 with the API key is not the same as trusting it with the contract.
 
-With no AI connected at all, drafting falls back to the job template. Every line
-comes back marked `template_default` with a note saying the description was never
-read, which holds the send gate shut until the owner has been through the lot. A
-template default the owner has checked is a real quote; a template default dressed
-up as an estimate is a lie the client pays for.
+The same discipline runs down the ladder. The parser marks a quantity
+`explicit_in_description` only when it read that number in a unit the price book
+uses — "two lifts" is two lifts, so it becomes a flag for the owner rather than
+2m² on a line. Anything it could not read is `template_default` with a note, which
+holds the send gate shut until the owner has been through the lot. And a
+transcript is never drafted from directly: it lands in the description box to be
+read and corrected first, because a misheard "ten lifts" would otherwise become a
+quantity a client pays for.
+
+A template default the owner has checked is a real quote; a template default
+dressed up as an estimate is a lie the client pays for.
 
 ## Core principles
 

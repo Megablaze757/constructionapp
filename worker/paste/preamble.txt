@@ -15,15 +15,24 @@
  *        AI_SHARED_TOKEN  (Secret)   callers must send it as a Bearer token
  *        GROQ_MODEL       (Variable) default llama-3.3-70b-versatile
  *        GROQ_VISION_MODEL(Variable) default meta-llama/llama-4-maverick-17b-128e-instruct
+ *        GROQ_TRANSCRIBE_MODEL (Variable) default whisper-large-v3-turbo
  *   4. Open https://<your-worker>.workers.dev/health — it should say ai: true.
  *   5. Put that URL in web/config.js as `aiBase`, or paste it into Settings on
  *      the site itself.
  *
  * ── What it does ────────────────────────────────────────────────────────────
- *   GET  /health   { ok, ai, model, vision_model }
- *   POST /draft    { description, template, price_book, similar_jobs,
- *                    estimating_history, photos: [{mime, b64}] }
- *              →   { ok: true, draft, model, mode, photos_used }
+ *   GET  /health     { ok, ai, model, vision_model, transcribe_model }
+ *   POST /draft      { description, template, price_book, similar_jobs,
+ *                      estimating_history, photos: [{mime, b64}] }
+ *                →   { ok: true, draft, model, mode, photos_used }
+ *   POST /transcribe multipart/form-data with an `audio` part (and optional
+ *                    `vocabulary`); turns a voice note into text.
+ *                →   { ok: true, text, model }
+ *
+ * Both are rungs on a ladder, not requirements. Without this worker the app
+ * reads descriptions with a pattern parser and transcribes with Whisper running
+ * in the browser — slower and less accurate, free and offline. This makes both
+ * better; it is not what makes them work.
  *
  * The model returns quantities and provenance. It is never given a price field
  * to fill in, cannot name a line the template does not offer, cannot claim high

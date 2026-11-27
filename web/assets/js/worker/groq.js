@@ -341,3 +341,71 @@ async function callGroq(env, body) {
     return { ok: false, error: 'Model did not return valid JSON', detail: String(content).slice(0, 500) };
   }
 }
+
+/* --------------------------------------------------------- speech to text */
+
+/** Transcription. Multilingual, and the cheapest of the Whisper models. */
+export const DEFAULT_TRANSCRIBE_MODEL = 'whisper-large-v3-turbo';
+
+export function transcribeModelFor(env) {
+  return env.GROQ_TRANSCRIBE_MODEL || DEFAULT_TRANSCRIBE_MODEL;
+}
+
+/**
+ * Turn recorded audio into text.
+ *
+ * The `prompt` is the reason this beats a browser's own speech recognition on a
+ * building site: Whisper accepts up to 224 tokens of context, so it can be told
+ * the trade vocabulary before it listens. "Soffit", "fascia", "lift" and "m²"
+ * are exactly the words that carry the money and exactly the ones a general
+ * recogniser mangles.
+ *
+ * @param {object} env
+ * @param {{audio: Blob|File, filename?: string, vocabulary?: string}} args
+ * @returns {Promise<{ok: true, text: string, model: string}
+ *                 | {ok: false, error: string, detail?: any, unconfigured?: true}>}
+ */
+export async function transcribe(env, { audio, filename = 'note.webm', vocabulary = '' }) {
+  if (!env.GROQ_API_KEY) {
+    return {
+      ok: false,
+      unconfigured: true,
+      error: 'No AI is connected — set GROQ_API_KEY on the Worker.',
+    };
+  }
+
+  const model = transcribeModelFor(env);
+  const form = new FormData();
+  form.append('file', audio, filename);
+  form.append('model', model);
+  form.append('response_format', 'json');
+  // Scaffolding and roofing are English-language trades here; naming the
+  // language stops Whisper spending effort detecting it and guessing wrong on a
+  // short, noisy clip.
+  form.append('language', env.GROQ_TRANSCRIBE_LANGUAGE || 'en');
+  form.append('temperature', '0');
+  if (vocabulary) form.append('prompt', vocabulary.slice(0, 800));
+
+  const base = (env.GROQ_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, '');
+  let res;
+  try {
+    res = await fetch(`${base}/audio/transcriptions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.GROQ_API_KEY}` },
+      body: form,
+    });
+  } catch (err) {
+    return { ok: false, error: `Could not reach Groq: ${err.message}` };
+  }
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    return { ok: false, error: `Groq returned ${res.status}`, detail: detail.slice(0, 500) };
+  }
+
+  const payload = await res.json().catch(() => null);
+  if (typeof payload?.text !== 'string') {
+    return { ok: false, error: 'Groq returned no transcript', detail: payload };
+  }
+  return { ok: true, text: payload.text.trim(), model };
+}

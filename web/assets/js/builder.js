@@ -170,9 +170,20 @@ function renderAiSummary(summary) {
 
   const list = (items) => items.map((s) => `<li>${esc(s)}</li>`).join('');
   const parts = [];
+  // None of the lower rungs is an estimate, and none may be allowed to look
+  // like one just because it appears in the same card. Each says exactly how
+  // much of the job was actually read.
   if (summary.ai === false) {
-    parts.push('<div class="notice notice-bad"><strong>No AI is connected, so your description was not read.</strong>'
-      + ' These are the template\'s own default quantities. Check every one against this job.</div>');
+    const why = summary.fell_back_from
+      ? `<p style="margin:6px 0 0">AI was configured but did not answer: ${esc(summary.fell_back_from)}</p>`
+      : '';
+    parts.push(summary.method === 'rules'
+      ? `<div class="notice notice-warn"><strong>Read by pattern, not by AI.</strong>
+         Figures your description stated in a unit the price book uses have been applied.
+         Everything else is the template's own default. Check every line.${why}</div>`
+      : `<div class="notice notice-bad"><strong>Your description was not read.</strong>
+         Nothing in it gave a quantity in a unit the price book uses, so these are the
+         template's own defaults. Check every one against this job.${why}</div>`);
   }
   if (summary.flags_for_owner_review?.length) {
     parts.push(`<div class="notice notice-warn"><strong>Check before sending</strong><ul>${list(summary.flags_for_owner_review)}</ul></div>`);
@@ -335,9 +346,11 @@ ${planText}` : planText;
     }));
 
     apply(await api.draft(quoteId, description, usePhotos, extraImages));
-    banner('warn', state.quote?.ai_summary?.ai === false
-      ? '<strong>Drafted from template.</strong> No AI key connected.'
-      : '<strong>Draft ready.</strong> Items marked 🤖 need a tap to confirm before sending.');
+    banner('warn', {
+      ai: '<strong>Draft ready.</strong> Items marked 🤖 need a tap to confirm before sending.',
+      rules: '<strong>Drafted from your wording.</strong> Figures it could match are in; the rest are template defaults — confirm every line before sending.',
+      template: '<strong>Drafted from the template.</strong> Nothing measurable was found in your description — confirm every line before sending.',
+    }[state.quote?.ai_summary?.method || 'ai']);
   } catch (err) {
     reportError(err);
   } finally {
@@ -348,64 +361,111 @@ ${planText}` : planText;
 
 /* -------------------------------------------------------- voice recording */
 
-function initSpeechRecognition() {
+/**
+ * Press to record, release to transcribe.
+ *
+ * Replaces the browser's Web Speech API, which never worked in Firefox and
+ * could not work offline. Recording goes through assets/js/transcribe.js, which
+ * tries Groq Whisper when an AI worker is configured and falls back to Whisper
+ * running on this device — free, and the only option with no signal.
+ *
+ * The transcript is appended to the description for the owner to read and fix.
+ * It is never drafted from directly: a misheard "ten lifts" would otherwise
+ * become a quantity on a quote a client pays.
+ */
+function initVoiceNotes() {
   const btn = $('record-btn');
+  const hint = $('record-hint');
   if (!btn) return;
 
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    btn.title = 'Web Speech API not supported in this browser. You can type directly below.';
-    btn.addEventListener('click', () => {
-      $('description')?.focus();
-    });
+  const supported = !!(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
+  if (!supported) {
+    btn.disabled = true;
+    btn.textContent = '● Voice notes need a newer browser';
+    if (hint) hint.textContent = 'Type the description below instead.';
     return;
   }
 
-  const recognition = new SpeechRecognition();
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.lang = 'en-GB';
+  const IDLE = '● Hold / Tap to speak quote';
+  let recorder = null;
+  let chunks = [];
+  let stream = null;
+  const say = (m) => { if (hint) hint.textContent = m; };
 
-  let isRecording = false;
-
-  btn.addEventListener('click', () => {
-    if (isRecording) {
-      recognition.stop();
-    } else {
-      try {
-        recognition.start();
-      } catch (err) {
-        console.error('Speech recognition error:', err);
-      }
+  async function start() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      // A refused microphone is a decision, not a fault — say what to do.
+      say('Microphone blocked. Allow it in your browser settings, or type below.');
+      return;
     }
-  });
-
-  recognition.onstart = () => {
-    isRecording = true;
+    chunks = [];
+    // Held in the closure as well as in `recorder`, because stop() clears that
+    // reference immediately while the 'stop' event arrives a tick later.
+    const rec = new MediaRecorder(stream);
+    recorder = rec;
+    rec.addEventListener('dataavailable', (e) => e.data.size && chunks.push(e.data));
+    rec.addEventListener('stop', () => {
+      stream.getTracks().forEach((t) => t.stop());
+      finish(new Blob(chunks, { type: rec.mimeType || 'audio/webm' }));
+    });
+    rec.start();
     btn.classList.add('recording');
-    btn.innerHTML = '🔴 Listening... Speak now (Tap to stop)';
-  };
+    btn.textContent = '🔴 Recording — release to transcribe';
+    say('Describe the job out loud. Numbers and units help.');
+  }
 
-  recognition.onend = () => {
-    isRecording = false;
+  function stop() {
+    if (recorder?.state === 'recording') recorder.stop();
+    recorder = null;
     btn.classList.remove('recording');
-    btn.innerHTML = '● Hold / Tap to speak quote';
-  };
+    btn.textContent = IDLE;
+  }
 
-  recognition.onresult = (event) => {
-    let transcript = '';
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      transcript += event.results[i][0].transcript;
-    }
-    const desc = $('description');
-    if (desc && transcript.trim()) {
-      desc.value = desc.value ? `${desc.value} ${transcript.trim()}` : transcript.trim();
+  async function finish(blob) {
+    if (!blob.size) return say('Nothing was recorded. Try holding the button a little longer.');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Transcribing…';
+    try {
+      const { transcribe } = await import('./transcribe.js');
+      const cfg = window.BUILDEROS_CONFIG || {};
+      const out = await transcribe(blob, {
+        aiBase: localStorage.getItem('builderos.aiBase') || cfg.aiBase || '',
+        aiToken: localStorage.getItem('builderos.aiToken') || cfg.aiToken || '',
+        onStage: (rung) => say(rung === 'groq'
+          ? 'Transcribing…'
+          : 'Transcribing on this device — the first time downloads a 41 MB model, then it works offline.'),
+        onProgress: (p) => {
+          if (typeof p.progress === 'number') say(`Downloading the speech model — ${Math.round(p.progress)}%`);
+          else if (p.note) say(p.note);
+        },
+      });
+
+      const desc = $('description');
+      desc.value = desc.value.trim() ? `${desc.value.trim()} ${out.text}` : out.text;
       touched.add('description');
+      desc.focus();
+      say(out.via === 'groq'
+        ? 'Transcribed. Read it over — then Generate Draft.'
+        : `Transcribed on this device${out.fellBackFrom ? ' (the AI worker did not answer)' : ''}. Read it over — then Generate Draft.`);
+    } catch (err) {
+      say(err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = IDLE;
     }
-  };
+  }
+
+  // Press-and-hold on a phone, click-to-toggle on a desktop: both, because the
+  // same screen is used with gloves on and at a desk.
+  btn.addEventListener('pointerdown', (e) => { e.preventDefault(); start(); });
+  btn.addEventListener('pointerup', stop);
+  btn.addEventListener('pointercancel', stop);
+  btn.addEventListener('pointerleave', () => { if (recorder?.state === 'recording') stop(); });
 }
 
-initSpeechRecognition();
+initVoiceNotes();
 
 /* --------------------------------------------------- whatsapp & link share */
 

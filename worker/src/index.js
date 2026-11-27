@@ -10,7 +10,7 @@
 import { json, fail, requireOwner, corsHeaders, newId, randomToken } from './http.js';
 import { priceLine, totalQuote, sendBlockers, money } from './pricing.js';
 import { requestDraft, aiConfigured } from './groq.js';
-import { templateDraft } from './fallback-draft.js';
+import { ruleDraft } from './rule-draft.js';
 import {
   jobVariance, byJobType, lineCodeBias, biasBriefing, summarise,
 } from './variance.js';
@@ -409,19 +409,45 @@ async function draftQuote(row, request, env, ctxo) {
     photos,
   });
 
-  // No AI connected yet is not an error the owner can act on. Start them from
-  // the template instead, labelled as such — see fallback-draft.js.
-  if (!result.ok && result.unconfigured) {
-    const fallback = templateDraft(template);
-    if (!fallback.ok) return fail(502, fallback.error, {}, ctxo);
+  /*
+   * The drafting ladder. A model is the best rung, not the only one, and an
+   * owner on a site with no signal still has a quote to write:
+   *
+   *   1. Groq, directly or through the AI worker — a real estimate.
+   *   2. The description parser — the numbers whose units it can match, and
+   *      honest about the rest. Free, instant, offline. See rule-draft.js.
+   *   3. Template defaults — when the description says nothing measurable.
+   *
+   * Rungs 2 and 3 are the same call: ruleDraft falls through to defaults per
+   * line. Dropping to them is reported (`ai: false`, `method`), never silent —
+   * the owner must know whether anything read the job.
+   */
+  if (!result.ok) {
+    const unreachable = !result.unconfigured;
+    const parsed = ruleDraft(description, template);
+    if (!parsed.ok) {
+      await db.logEvent(D1, row.id, 'ai_draft_failed', { error: result.error });
+      return fail(502, result.error || parsed.error, { detail: result.detail }, ctxo);
+    }
+
+    const method = parsed.used ? 'rules' : 'template';
     result = {
-      ok: true, ai: false, draft: fallback.draft, model: 'template defaults (no AI connected)',
-      mode: 'template', photos_used: 0,
+      ok: true,
+      ai: false,
+      method,
+      draft: parsed.draft,
+      model: parsed.used
+        ? `your description, read by pattern (${parsed.used} figure${parsed.used === 1 ? '' : 's'} matched)`
+        : 'template defaults',
+      // An AI that is configured but unreachable is a different situation from
+      // one that was never set up, and the owner can act on exactly one of them.
+      fell_back_from: unreachable ? result.error : null,
+      mode: method,
+      photos_used: 0,
     };
-    await db.logEvent(D1, row.id, 'template_drafted', { lines: fallback.draft.line_items.length });
-  } else if (!result.ok) {
-    await db.logEvent(D1, row.id, 'ai_draft_failed', { error: result.error });
-    return fail(502, result.error, { detail: result.detail }, ctxo);
+    await db.logEvent(D1, row.id, 'drafted_without_ai', {
+      method, matched: parsed.used, reason: unreachable ? result.error : 'no AI configured',
+    });
   }
 
   const map = db.priceBookMap(book);
@@ -462,8 +488,12 @@ async function draftQuote(row, request, env, ctxo) {
     estimating_history: estimatingHistory,
     photos_used: result.photos_used,
     model: result.model,
-    // The builder reads this to decide whether to call the result an estimate.
+    // The builder reads these to decide what to call the result. `method` is
+    // 'ai', 'rules' or 'template'; `fell_back_from` carries the reason an AI
+    // that was configured did not answer, so the owner can go and fix it.
     ai: result.ai !== false,
+    method: result.method || 'ai',
+    fell_back_from: result.fell_back_from || null,
     drafted_at: new Date().toISOString(),
   };
   await D1.prepare('UPDATE quotes SET description = ?2, ai_summary = ?3 WHERE id = ?1')

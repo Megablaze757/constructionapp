@@ -84,6 +84,7 @@ self-contained file for exactly this: no build, no CLI, no database.
    | `AI_SHARED_TOKEN` | Secret | optional; callers must send it as a bearer token |
    | `GROQ_MODEL` | Variable | optional, see [Choosing a model](#choosing-a-model) |
    | `GROQ_VISION_MODEL` | Variable | optional, used only when photos are attached |
+   | `GROQ_TRANSCRIBE_MODEL` | Variable | optional, default `whisper-large-v3-turbo` |
 
 4. Check it: `curl https://<worker>.workers.dev/health` → `{"ok":true,"ai":true,…}`.
 5. On the site: **Settings → AI worker URL** → paste → Save. Or set the repository
@@ -302,6 +303,33 @@ the Worker's real code rather than a re-implementation of it, and that only stay
 true if the copy is mechanical.
 
 ---
+
+## Voice notes
+
+Holding the record button on the quote builder transcribes speech into the
+description box. Two rungs, tried in order:
+
+1. **Groq Whisper**, through the AI worker's `/transcribe`. About £0.0007 a
+   minute on `whisper-large-v3-turbo`, billed in 10-second minimums. It is sent
+   up to 224 tokens of trade vocabulary first — "soffit", "fascia", "lift", "m²"
+   — which is what a general recogniser turns into nonsense.
+2. **Whisper in the browser**, with no key and no network. The first use
+   downloads a ~41MB quantised `whisper-tiny.en` and caches it; after that it
+   works offline forever. Measured on CPU with no GPU: ready in ~5s, and about
+   3× faster than real-time, so a 30-second note returns in about ten seconds.
+
+The transcript is never drafted from directly — it lands in the description for
+the owner to read and correct, because a misheard quantity would otherwise reach
+a client.
+
+The on-device rung pulls the model from the Hugging Face CDN on first use. That
+is the one third-party runtime dependency in the published site (sql.js is
+vendored precisely to avoid such things, but 41MB of weights cannot sensibly
+live in git). If it is unreachable, the app says so and the owner types instead.
+
+Browser support: recording needs `MediaRecorder` and a microphone permission,
+which Chrome, Safari 14.1+ and Firefox all have — unlike the Web Speech API this
+replaced, which Firefox never implemented.
 
 ## Choosing a model
 

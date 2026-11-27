@@ -10,7 +10,7 @@
  * at all rather than merely load and then fail.
  */
 
-const CACHE = 'builderos-shell-v7';
+const CACHE = 'builderos-shell-v8';
 const SHELL = [
   './',
   './index.html',
@@ -49,10 +49,12 @@ const SHELL = [
   './assets/schema.sql',
   './assets/js/local/backend.js',
   './assets/js/local/d1.js',
+  './assets/js/transcribe.js',
+  './assets/js/local/whisper-worker.js',
   ...[
-    'automation', 'dashboard', 'db', 'delegation', 'fallback-draft', 'groq', 'http',
+    'automation', 'dashboard', 'db', 'delegation', 'groq', 'http',
     'index', 'invoicing', 'messaging', 'pricing', 'reliability', 'schema',
-    'templates', 'variance',
+    'rule-draft', 'templates', 'variance',
   ].map((m) => `./assets/js/worker/${m}.js`),
 ];
 

@@ -19,7 +19,33 @@ const port = Number(process.argv[2] || 8799);
 /** Set STUB_MODE=bad to make it return a contract-violating draft. */
 const MODE = process.env.STUB_MODE || 'good';
 
+/**
+ * What the stub "hears". Deliberately contains a number in a unit the price book
+ * uses ("five days") and one it does not ("two lifts"), so the drafting ladder
+ * below it is exercised on both.
+ */
+const STUB_TRANSCRIPT = "Rear of the house, scaffold for the roofers, "
+  + "probably two lifts, they'll be up there about five days.";
+
 const server = createServer((req, res) => {
+  // Speech to text. The audio itself is discarded — what is under test is the
+  // upload path and the plumbing, not Whisper.
+  if (req.method === 'POST' && req.url.endsWith('/audio/transcriptions')) {
+    let bytes = 0;
+    req.on('data', (c) => { bytes += c.length; });
+    req.on('end', () => {
+      if (!bytes) {
+        res.writeHead(400, { 'Content-Type': 'application/json' })
+          .end(JSON.stringify({ error: { message: 'no audio uploaded' } }));
+        return;
+      }
+      console.log(`[stub] transcribed ${bytes} bytes of audio`);
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+        .end(JSON.stringify({ text: STUB_TRANSCRIPT }));
+    });
+    return;
+  }
+
   if (req.method !== 'POST' || !req.url.endsWith('/chat/completions')) {
     res.writeHead(404).end('not found');
     return;
