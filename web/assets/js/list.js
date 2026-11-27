@@ -36,6 +36,178 @@ $('settings-btn').addEventListener('click', async () => {
   dialog.showModal();
 });
 
+/* --------------------------------------------- import their own quote */
+
+/**
+ * Turning a quote they have already sent into a template and a price book.
+ *
+ * Nothing is saved until this dialog is confirmed, because committing writes to
+ * the price book and every future quote is costed from it. The review shows the
+ * figures as read, says where each cost came from, and cross-checks the line
+ * totals against the quote's own subtotal — if those disagree, a line was
+ * missed, and the owner needs to know that before their rates come from it.
+ */
+const importDialog = $('import-dialog');
+let importParsed = null;
+
+const importSay = (m) => ($('import-status').textContent = m);
+const money = (n) => `£${Number(n).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+$('import-btn')?.addEventListener('click', () => $('import-input').click());
+
+$('import-input')?.addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  e.target.value = '';
+  if (!file) return;
+
+  importSay(`Reading ${file.name}…`);
+  try {
+    const { processDocument } = await import('./plans.js');
+    const doc = await processDocument(file);
+    if (!doc.text || doc.text.length < 40) {
+      importSay(doc.images.length
+        ? `${file.name} is a drawing, not a quote — there is no text in it to read line items from.`
+        : `There was not enough readable text in ${file.name}.`);
+      return;
+    }
+    const { parsed } = await api.importPreview(doc.text, file.name.replace(/\.[^.]+$/, ''));
+    importParsed = { ...parsed, source_name: file.name };
+    openImportDialog();
+    importSay('');
+  } catch (err) {
+    importSay(err.message);
+  }
+});
+
+function openImportDialog() {
+  const p = importParsed;
+  $('import-source').textContent = `Read from ${p.source_name} — ${p.lines.length} work item${p.lines.length === 1 ? '' : 's'}.`;
+  $('import-name').value = p.name;
+  $('import-jobtype').value = p.job_type;
+  $('import-margin').value = 30;
+
+  // Each check is reported on its own, pass or fail. The subtotal check is the
+  // one that says whether the whole quote was read, so it is never hidden
+  // behind another warning — a clean total is as much information as a warning.
+  const checks = [];
+  const sum = p.lines.reduce((t, l) => t + l.line_total, 0);
+
+  if (p.totals?.subtotal) {
+    const matches = Math.abs(sum - p.totals.subtotal) <= 0.02;
+    checks.push({
+      ok: matches,
+      html: matches
+        ? `These lines add up to ${money(sum)}, matching your quote's own subtotal — so nothing was missed.`
+        : `These lines add up to ${money(sum)}, but your quote says the subtotal is `
+          + `${money(p.totals.subtotal)}. That gap is ${money(Math.abs(sum - p.totals.subtotal))} of work `
+          + 'not read — check what is missing below before saving.',
+    });
+  }
+
+  for (const l of p.lines.filter((x) => !x.consistent)) {
+    checks.push({ ok: false, html: `<strong>${esc(l.description)}</strong> — ${esc(l.note)}` });
+  }
+
+  if (p.skipped?.length) {
+    checks.push({
+      ok: false,
+      html: `${p.skipped.length} priced line${p.skipped.length === 1 ? '' : 's'} could not be read as work: `
+        + `${p.skipped.slice(0, 4).map((t) => `<code>${esc(t)}</code>`).join(', ')}`,
+    });
+  }
+
+  const failed = checks.filter((c) => !c.ok);
+  $('import-warnings').innerHTML = checks.length
+    ? `<div class="notice notice-${failed.length ? 'warn' : 'ok'}">
+         <strong>${failed.length ? 'Worth checking before you save' : 'This adds up'}</strong>
+         <ul>${checks.map((c) => `<li>${failed.length && c.ok ? '✅ ' : ''}${c.html}</li>`).join('')}</ul>
+       </div>`
+    : '';
+
+  renderImportLines();
+  updateImportCosts();
+  importDialog.showModal();
+}
+
+function renderImportLines() {
+  $('import-lines').innerHTML = importParsed.lines.map((l, i) => `
+    <div class="line ${l.consistent ? '' : 'unconfirmed'}">
+      <div class="line-desc">
+        ${l.consistent ? '' : '<span class="dot" title="The arithmetic does not add up"></span>'}
+        <input type="text" class="import-desc" data-i="${i}" value="${esc(l.description)}" aria-label="Description">
+      </div>
+      <div class="line-qty">
+        <input type="number" class="import-qty" data-i="${i}" value="${l.quantity}" step="any" min="0" aria-label="Quantity">
+        ${esc(l.unit)} @
+        <input type="number" class="import-price" data-i="${i}" value="${l.unit_price}" step="0.01" min="0" aria-label="Price each">
+      </div>
+      <div class="line-price">${money(l.line_total)}</div>
+      <div class="line-note" data-cost="${i}"></div>
+    </div>`).join('');
+
+  for (const [cls, field, cast] of [
+    ['import-desc', 'description', String],
+    ['import-qty', 'quantity', Number],
+    ['import-price', 'unit_price', Number],
+  ]) {
+    $('import-lines').querySelectorAll(`.${cls}`).forEach((el) => {
+      el.addEventListener('input', () => {
+        importParsed.lines[Number(el.dataset.i)][field] = cast(el.value);
+        updateImportCosts();
+      });
+    });
+  }
+}
+
+/**
+ * Show the cost each line would be saved at, and say where it came from.
+ *
+ * Recomputed live rather than on save, so the owner sees what a margin of 30%
+ * actually means in pounds for their own rates before committing to it.
+ */
+function updateImportCosts() {
+  const pct = Number($('import-margin').value);
+  const valid = Number.isFinite(pct) && pct >= 0 && pct < 100;
+  $('import-lines').querySelectorAll('[data-cost]').forEach((el) => {
+    const l = importParsed.lines[Number(el.dataset.cost)];
+    el.textContent = valid
+      ? `Cost ${money(l.unit_price * (1 - pct / 100))} each, worked back from the ${pct}% margin you gave — not read from your quote.`
+      : 'Give a margin between 0 and 99 to work the cost out.';
+  });
+  $('import-cost-note').textContent = valid
+    ? `Every line will be saved at ${pct}% margin. Edit a price above and the cost follows.`
+    : 'A typical margin must be between 0 and 99 per cent.';
+}
+
+$('import-margin')?.addEventListener('input', updateImportCosts);
+
+importDialog?.addEventListener('close', async () => {
+  if (importDialog.returnValue !== 'save' || !importParsed) return;
+  importSay('Saving…');
+  try {
+    const res = await api.importCommit({
+      job_type: $('import-jobtype').value.trim(),
+      name: $('import-name').value.trim(),
+      // Line totals are recomputed from whatever the owner left in the fields,
+      // so an edited quantity or rate is saved consistently rather than against
+      // the figure originally read.
+      lines: importParsed.lines.map((l) => ({
+        ...l,
+        line_total: Math.round(l.quantity * l.unit_price * 100) / 100,
+        consistent: true,
+      })),
+      margin_pct: Number($('import-margin').value),
+      source_name: importParsed.source_name,
+    });
+    importSay(`Saved "${res.template.name}" — ${res.price_book_rows} rates added to your price book. `
+      + 'Pick it under Job type above.');
+    await loadTemplates();
+  } catch (err) {
+    const detail = Array.isArray(err.body?.detail) ? ` ${err.body.detail.join(' ')}` : '';
+    importSay(`${err.message}${detail}`);
+  }
+});
+
 /* ------------------------------------------------------------ on-device backup */
 
 const backupSay = (m) => ($('backup-status').textContent = m);

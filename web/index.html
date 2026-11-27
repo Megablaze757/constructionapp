@@ -36,6 +36,20 @@
     </div>
   </div>
 
+  <!-- Make the app quote in your shape, at your rates -->
+  <div class="card">
+    <h2>📄 Use your own quote</h2>
+    <div class="card-body">
+      <p class="muted" style="margin:0">
+        Upload a quote you have already sent and it becomes a template you can pick for
+        future jobs — your wording, your line items, your rates. PDF, photo or text.
+      </p>
+      <input type="file" id="import-input" accept=".pdf,.txt,.csv,image/*" hidden>
+      <button class="btn" id="import-btn" type="button">Upload a quote →</button>
+      <p class="muted" id="import-status" style="margin:0"></p>
+    </div>
+  </div>
+
   <!-- Smart Recurring Template Suggestions -->
   <div class="card" id="suggestions-card" hidden>
     <h2>💡 Frequently Quoted Shapes</h2>
@@ -100,6 +114,41 @@
     <div class="btn-row" style="margin-top: 12px;">
       <button class="btn" value="cancel" type="submit">Cancel</button>
       <button class="btn btn-primary" id="save-settings" value="save" type="submit">Save Settings</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Review what was read out of their quote before any of it is saved -->
+<dialog id="import-dialog">
+  <form method="dialog" class="card-body">
+    <h2>Check this before it is saved</h2>
+    <p class="muted" style="margin:0" id="import-source"></p>
+
+    <div id="import-warnings"></div>
+
+    <label>Template name
+      <input type="text" id="import-name" autocomplete="off">
+    </label>
+    <label>Job type <span class="muted">(how you will pick it later)</span>
+      <input type="text" id="import-jobtype" autocomplete="off">
+    </label>
+
+    <div class="import-lines" id="import-lines"></div>
+
+    <h2 style="margin-top:10px">What does this work cost you?</h2>
+    <p class="muted" style="margin:0">
+      Your quote shows what the client pays, not what the job costs you — so we cannot
+      read it. Give your typical margin and we will work the costs back from your prices,
+      or type each one in. Either way the margin gate needs it to mean anything.
+    </p>
+    <label>Typical margin
+      <input type="number" id="import-margin" min="0" max="99" step="1" value="30" inputmode="decimal">
+    </label>
+    <p class="muted" id="import-cost-note" style="margin:0"></p>
+
+    <div class="btn-row" style="margin-top:12px">
+      <button class="btn" value="cancel" type="submit">Cancel</button>
+      <button class="btn btn-primary" value="save" type="submit">Save as my template</button>
     </div>
   </form>
 </dialog>

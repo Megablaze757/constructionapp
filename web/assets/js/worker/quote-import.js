@@ -137,8 +137,14 @@ export function parseQuoteLines(text) {
       if (!/\d+\s*(?:m2|m²|days?|job)\b/i.test(line)) continue;
     }
 
+    // Only a line carrying money is worth reporting as a possible miss. A
+    // quote's letterhead, site address and date are not work items, and
+    // flagging them as unreadable would bury a real omission under noise the
+    // owner learns to ignore.
+    const looksMonetary = /[£$€]\s?\d|\d+\.\d{2}(?!\d)/.test(line);
+
     if (section !== 'work' || NOT_WORK.test(line)) {
-      if (section === 'work' && NOT_WORK.test(line)) skipped.push(line.slice(0, 90));
+      if (section === 'work' && NOT_WORK.test(line) && looksMonetary) skipped.push(line.slice(0, 90));
       continue;
     }
 
@@ -149,7 +155,7 @@ export function parseQuoteLines(text) {
       /^(.*?)[\s.·-]*(\d+(?:\.\d+)?)\s*([a-zA-Z²][a-zA-Z0-9²]*)\s*[@xX]?\s*([£$€]?\s?[\d,]+(?:\.\d{2})?)(?:\s*[£$€]?\s?([\d,]+(?:\.\d{2})?))?\s*$/,
     );
     if (!m) {
-      if (/[\d]/.test(line) && line.length > 8) skipped.push(line.slice(0, 90));
+      if (looksMonetary) skipped.push(line.slice(0, 90));
       continue;
     }
 
@@ -157,6 +163,8 @@ export function parseQuoteLines(text) {
     const unit = canonicalUnit(unitRaw);
     const description = descRaw.replace(/[\s,:–—-]+$/, '').trim();
     if (!unit || !description) {
+      // This one is always worth reporting: it had a quantity and a price, so
+      // it was almost certainly a work item we could not map.
       skipped.push(line.slice(0, 90));
       continue;
     }

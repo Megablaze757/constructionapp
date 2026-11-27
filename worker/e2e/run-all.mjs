@@ -16,6 +16,7 @@ const JOURNEYS = [
   ['Oversight — dashboard, reliability, automations', './oversight.mjs'],
   ['Local mode — the whole app with no Worker at all', './local.mjs'],
   ['Voice notes — speak the job, transcription ladder', './voice.mjs'],
+  ['Their own quote — imported as a template and price book', './import.mjs'],
 ];
 
 const only = process.argv[2];

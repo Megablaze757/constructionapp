@@ -238,6 +238,13 @@ export const api = {
   templates: () => request('/api/templates'),
   templateSuggestions: () => request('/api/templates/suggestions'),
   createTemplate: (tpl) => request('/api/templates', { method: 'POST', body: tpl }),
+
+  /** Read an uploaded quote and report what is in it. Writes nothing. */
+  importPreview: (text, name) =>
+    request('/api/templates/import?preview=1', { method: 'POST', body: { text, name } }),
+
+  /** Save a reviewed import as a template, and its rates into the price book. */
+  importCommit: (payload) => request('/api/templates/import', { method: 'POST', body: payload }),
   priceBook: () => request('/api/pricebook'),
   listQuotes: () => request('/api/quotes'),
   createQuote: (data) => request('/api/quotes', { method: 'POST', body: data }),

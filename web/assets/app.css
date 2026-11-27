@@ -378,3 +378,47 @@ body:has(.bottom-nav):has(.actionbar) .shell {
   .card-body { padding: 24px; }
   .actionbar .inner { flex-direction: row; align-items: center; justify-content: space-between; }
 }
+
+/* ------------------------------------------- Importing their own quote */
+
+/*
+ * The review table. Built on .line so an imported row reads the same as a quote
+ * row — same amber dot for "needs your eye", same note underneath — but with the
+ * figures editable, because this is the one place the owner is correcting what
+ * was read rather than confirming what was drafted.
+ */
+.import-lines {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.import-lines .line {
+  border-bottom: 1px solid var(--line);
+}
+.import-lines .line:last-child { border-bottom: 0; }
+
+.import-lines input {
+  background: var(--surface-2);
+  border: 1px solid var(--line-light);
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  min-height: 38px;
+}
+
+.import-lines .import-desc { width: 100%; font-weight: 600; }
+.import-lines .import-qty { width: 5.5em; }
+.import-lines .import-price { width: 6.5em; }
+
+.import-lines .line-qty {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.import-lines .line-note { font-size: 12px; }
