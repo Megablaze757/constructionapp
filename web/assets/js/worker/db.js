@@ -600,6 +600,33 @@ export async function createTemplate(db, tpl) {
   ).run();
 }
 
+/**
+ * Add price-book rows from an imported quote.
+ *
+ * Upserts on `code`, because re-importing a corrected quote should update the
+ * owner's rates rather than fail or quietly duplicate them under a suffixed
+ * code — a duplicated rate is one that some quotes use and others do not.
+ */
+export async function upsertPriceBook(db, rows) {
+  if (!rows.length) return 0;
+  await db.batch(rows.map((r) => db.prepare(
+    `INSERT INTO price_book (code, description, category, unit, unit_cost, unit_price)
+     VALUES (?1,?2,?3,?4,?5,?6)
+     ON CONFLICT(code) DO UPDATE SET
+       description = excluded.description,
+       category    = excluded.category,
+       unit        = excluded.unit,
+       unit_cost   = excluded.unit_cost,
+       unit_price  = excluded.unit_price`,
+  ).bind(r.code, r.description, r.category, r.unit, r.unit_cost, r.unit_price)));
+  return rows.length;
+}
+
+/** Replace any template for this job type, so a re-import corrects rather than duplicates. */
+export async function deleteTemplatesForJobType(db, jobType) {
+  await db.prepare('DELETE FROM quote_templates WHERE job_type = ?1').bind(jobType).run();
+}
+
 /* ------------------------------------------------------------------ photos */
 
 export async function listPhotos(db, quoteId, { clientOnly = false } = {}) {

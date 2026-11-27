@@ -12,6 +12,9 @@ import { priceLine, totalQuote, sendBlockers, money } from './pricing.js';
 import { requestDraft, aiConfigured } from './groq.js';
 import { ruleDraft } from './rule-draft.js';
 import {
+  parseQuoteLines, applyMargin, validateImport, toTemplateAndPriceBook, jobTypeFrom,
+} from './quote-import.js';
+import {
   jobVariance, byJobType, lineCodeBias, biasBriefing, summarise,
 } from './variance.js';
 import { suggestTemplates } from './templates.js';
@@ -114,6 +117,83 @@ async function ownerRoutes(path, request, env, ctxo) {
   }
 
   // Accept a suggestion (or create a template outright).
+  /**
+   * Turn the owner's own quote into a template and a price book.
+   *
+   * Two steps on purpose. `?preview=1` reads the document and returns what it
+   * found, writing nothing; the owner checks the figures and supplies the one
+   * thing a quote cannot tell us — what the work costs them — and only then is
+   * anything saved. This writes to the price book, which every future quote is
+   * costed from, so it is not a one-shot button.
+   */
+  if (resource === 'templates' && id === 'import' && method === 'POST') {
+    const body = await readJson(request);
+    const preview = new URL(request.url).searchParams.has('preview');
+
+    if (preview) {
+      const text = String(body.text || '').trim();
+      if (text.length < 40) {
+        return fail(400, 'There was not enough readable text in that document to find any work items.', {}, ctxo);
+      }
+      const parsed = parseQuoteLines(text);
+      if (!parsed.lines.length) {
+        return fail(400, 'No work items could be read from that document. It needs lines with a quantity, a unit and a price.', {
+          skipped: parsed.skipped,
+        }, ctxo);
+      }
+      return json({
+        parsed: {
+          job_type: jobTypeFrom(text),
+          name: String(body.name || '').trim() || 'My quote template',
+          ...parsed,
+        },
+      }, ctxo);
+    }
+
+    // Committing. The lines are whatever the owner confirmed, which may differ
+    // from what was parsed — that is the point of the preview.
+    let lines = Array.isArray(body.lines) ? body.lines : [];
+    if (body.margin_pct !== undefined && body.margin_pct !== null && body.margin_pct !== '') {
+      try {
+        lines = applyMargin(lines, body.margin_pct);
+      } catch (err) {
+        return fail(400, err.message, {}, ctxo);
+      }
+    }
+
+    const imported = {
+      job_type: String(body.job_type || '').trim(),
+      name: String(body.name || '').trim(),
+      lines,
+      terms: body.terms ?? null,
+      exclusions: body.exclusions ?? null,
+    };
+    const checked = validateImport(imported);
+    if (!checked.ok) return fail(400, 'That import is not ready to save.', { detail: checked.errors }, ctxo);
+
+    const { price_book: rows, template } = toTemplateAndPriceBook(checked.value);
+    await db.upsertPriceBook(D1, rows);
+    // A re-import of a corrected quote should replace the template for that job
+    // type rather than leave two, which would make quoting a coin toss.
+    await db.deleteTemplatesForJobType(D1, template.job_type);
+
+    const margin = Number(body.default_margin ?? body.margin_pct ?? 30);
+    const tpl = {
+      id: newId('tpl'),
+      ...template,
+      default_margin: margin,
+      margin_floor: Number(body.margin_floor ?? Math.max(0, margin - 5)),
+      validity_days: Number(body.validity_days ?? 30),
+    };
+    await db.createTemplate(D1, tpl);
+
+    return json({
+      template: tpl,
+      price_book_rows: rows.length,
+      imported_from: String(body.source_name || 'your quote'),
+    }, { ...ctxo, status: 201 });
+  }
+
   if (resource === 'templates' && !id && method === 'POST') {
     const body = await readJson(request);
     const jobType = String(body.job_type || '').trim();
