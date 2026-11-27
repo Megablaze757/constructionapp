@@ -26,6 +26,7 @@ $('settings-btn').addEventListener('click', async () => {
   $('owner-token').value = ownerToken.get();
   $('ai-base').value = localStorage.getItem(AI_BASE_KEY) || '';
   $('ai-token').value = localStorage.getItem(AI_TOKEN_KEY) || '';
+  $('backup-section').hidden = !isLocal();
   $('mode-explainer').innerHTML = isLocal()
     ? 'Nothing is deployed, so BuilderOS is running in this browser and storing everything on '
       + 'this device. Deploy the Worker and set its URL to share the data, send client links '
@@ -33,6 +34,54 @@ $('settings-btn').addEventListener('click', async () => {
     : `Talking to your Cloudflare Worker. The owner token is the <code>OWNER_TOKEN</code> secret
        you set on it, and is stored only in this browser.${running ? '' : ' Paste it below to start.'}`;
   dialog.showModal();
+});
+
+/* ------------------------------------------------------------ on-device backup */
+
+const backupSay = (m) => ($('backup-status').textContent = m);
+
+$('backup-btn')?.addEventListener('click', async () => {
+  try {
+    const bytes = await api.exportLocal();
+    const stamp = new Date().toISOString().slice(0, 10);
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `builderos-backup-${stamp}.sqlite`;
+    a.click();
+    // Revoked on a delay: Safari has not necessarily started the download by
+    // the time click() returns, and revoking early cancels it.
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    backupSay(`Saved builderos-backup-${stamp}.sqlite — ${Math.round(bytes.length / 1024)}KB.`);
+  } catch (err) {
+    backupSay(err.message);
+  }
+});
+
+$('restore-btn')?.addEventListener('click', () => $('restore-input').click());
+
+$('restore-input')?.addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  e.target.value = '';
+  if (!file) return;
+
+  // Restoring is not undoable and takes everything with it, so it is asked
+  // rather than assumed — and the file is validated before anything is written.
+  if (!window.confirm(
+    `Restore from ${file.name}?
+
+Everything currently on this device will be replaced. `
+    + 'If you have not backed it up, cancel and do that first.',
+  )) return;
+
+  backupSay('Checking the file…');
+  try {
+    await api.restoreLocal(await file.arrayBuffer());
+    backupSay('Restored. Reloading…');
+    setTimeout(() => location.reload(), 600);
+  } catch (err) {
+    backupSay(err.message);
+  }
 });
 
 dialog.addEventListener('close', () => {

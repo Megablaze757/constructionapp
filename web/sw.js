@@ -10,7 +10,7 @@
  * at all rather than merely load and then fail.
  */
 
-const CACHE = 'builderos-shell-v8';
+const CACHE = 'builderos-shell-v9';
 const SHELL = [
   './',
   './index.html',

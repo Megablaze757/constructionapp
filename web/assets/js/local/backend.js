@@ -94,6 +94,39 @@ async function boot() {
 
     /** Everything held on this device, for backing up or moving to a Worker. */
     export: () => sqlite.export(),
+
+    /**
+     * Replace the database with a backup.
+     *
+     * Written straight to IndexedDB rather than swapped into the open handle,
+     * because every module here holds a reference to that handle and a
+     * half-replaced database is worse than a reload. The caller reloads and the
+     * next boot picks it up.
+     *
+     * Checked before it is written: a file that is not one of ours would
+     * otherwise land in storage and break the app on next open, with the
+     * original already gone.
+     */
+    async restore(bytes) {
+      const data = new Uint8Array(bytes);
+      if (String.fromCharCode(...data.slice(0, 15)) !== 'SQLite format 3') {
+        throw new Error('That is not a BuilderOS backup — it is not a SQLite file.');
+      }
+      let probe;
+      try {
+        probe = new SQLModule.Database(data);
+        const [found] = probe.exec(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('quotes','price_book','jobs')",
+        );
+        const tables = (found?.values || []).flat();
+        if (tables.length < 3) {
+          throw new Error('That SQLite file is not a BuilderOS backup — it has none of its tables.');
+        }
+      } finally {
+        probe?.close();
+      }
+      await idbPut(data);
+    },
   };
 
   return backend;

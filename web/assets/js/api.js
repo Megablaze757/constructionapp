@@ -331,6 +331,26 @@ export const api = {
     if (!local) throw new ApiError('Not running in local mode.', 400);
     await local.reset();
   },
+
+  /**
+   * The whole on-device database as a file.
+   *
+   * The counterpart to the warning this app shows on every screen in local
+   * mode: the data is on one device, so there has to be a way to get it off.
+   * It is a plain SQLite file — openable with any SQLite tool, not just by us.
+   */
+  async exportLocal() {
+    await mode();
+    if (!local) throw new ApiError('There is nothing on this device to back up — you are using a Worker.', 400);
+    return local.export();
+  },
+
+  /** Replace the on-device database with a backup. The caller must reload. */
+  async restoreLocal(bytes) {
+    await mode();
+    if (!local) throw new ApiError('Restore only applies on-device — you are using a Worker.', 400);
+    await local.restore(bytes);
+  },
 };
 
 /* ------------------------------------------------------------------ client */

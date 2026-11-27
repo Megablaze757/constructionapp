@@ -83,6 +83,20 @@
       <input type="text" id="ai-token" placeholder="Enter AI access token" autocomplete="off">
     </label>
 
+    <div id="backup-section" hidden>
+      <h2 style="margin-top:10px">Back up this device</h2>
+      <p class="muted" style="margin:0">
+        Your quotes and jobs are stored in this browser only. Clearing site data deletes them.
+        A backup is a plain SQLite file — keep it somewhere safe, and restore it here or on a new phone.
+      </p>
+      <div class="btn-row" style="margin-top:8px">
+        <button class="btn" id="backup-btn" type="button">⬇️ Download backup</button>
+        <button class="btn" id="restore-btn" type="button">⬆️ Restore a backup</button>
+      </div>
+      <input type="file" id="restore-input" accept=".sqlite,.db,application/octet-stream" hidden>
+      <p class="muted" id="backup-status" style="margin:6px 0 0"></p>
+    </div>
+
     <div class="btn-row" style="margin-top: 12px;">
       <button class="btn" value="cancel" type="submit">Cancel</button>
       <button class="btn btn-primary" id="save-settings" value="save" type="submit">Save Settings</button>

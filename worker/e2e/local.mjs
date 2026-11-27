@@ -140,6 +140,67 @@ export default async function run() {
     `no model named: ${body.replace(/\s+/g, ' ').slice(-120)}`);
   await returning.screenshot({ path: `${SHOTS}/local-ai.png`, fullPage: true });
 
+  /* ------------------------------------------------- backup and restore */
+
+  step('Back the device up, since that is all there is');
+  // Settings lives on the quotes screen; the AI check above left us in the builder.
+  await returning.goto(`${WEB}/index.html?api=`);
+  await returning.waitForSelector('#settings-btn', { timeout: 30000 });
+  await returning.click('#settings-btn');
+  await returning.waitForSelector('#settings-dialog[open]');
+  check(!await returning.locator('#backup-section').isHidden(),
+    'the backup section is offered on-device', 'no backup section in local mode');
+
+  // Read the bytes through the API rather than catching a download, because a
+  // headless download tells us a file arrived, not that it is a usable database.
+  // Carried out of the page as base64 and held here, so it survives the reload
+  // that the wipe needs — which is the whole point of a backup.
+  const backup = await returning.evaluate(async () => {
+    const { api } = await import('./assets/js/api.js');
+    const bytes = await api.exportLocal();
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    }
+    return { b64: btoa(binary), size: bytes.length, magic: String.fromCharCode(...bytes.slice(0, 15)) };
+  });
+  check(backup.magic === 'SQLite format 3', `backup is a real SQLite file (${Math.round(backup.size / 1024)}KB)`,
+    `backup header was "${backup.magic}"`);
+  await returning.click('#settings-dialog button[value="cancel"]');
+
+  step('A file that is not a backup is refused before anything is overwritten');
+  const refused = await returning.evaluate(async () => {
+    const { api } = await import('./assets/js/api.js');
+    try {
+      await api.restoreLocal(new TextEncoder().encode('just a text file, not a database'));
+      return 'accepted';
+    } catch (err) {
+      return err.message;
+    }
+  });
+  check(/not a SQLite file/.test(refused), `rubbish refused: "${refused}"`, `restore accepted rubbish: ${refused}`);
+  await returning.waitForFunction(() => document.body.innerText.includes('Local Only') || true);
+
+  step('Wipe the device, then restore from the backup');
+  await returning.evaluate(async () => {
+    const { api } = await import('./assets/js/api.js');
+    await api.resetLocal();
+  });
+  await returning.reload();
+  await returning.waitForFunction(() => !document.body.innerText.includes('Local Only'), null, { timeout: 30000 });
+  ok('reset back to seed data — the quote is gone');
+
+  await returning.evaluate(async (b64) => {
+    const { api } = await import('./assets/js/api.js');
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    await api.restoreLocal(bytes);
+  }, backup.b64);
+  await returning.reload();
+  await returning.waitForFunction(() => document.body.innerText.includes('Local Only'), null, { timeout: 30000 });
+  ok('restored from the file — the quote written before the wipe is back');
+
   step('Console');
   reportConsole(errors);
 
