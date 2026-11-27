@@ -151,3 +151,35 @@ test('an empty template is a reported failure, not an empty quote', () => {
   assert.equal(res.ok, false);
   assert.match(res.error, /no line items/);
 });
+
+test('a template with no default is a placeholder, not a figure', () => {
+  // The seeded scaffold template stores null for m² on purpose: it depends on
+  // the building. 1m² of scaffold prices at £27, so this must not read as the
+  // template's opinion of the job.
+  const noDefault = {
+    job_type: 'domestic_scaffold_erect',
+    line_items: [
+      { line_code: 'scaffold_erect', description: 'Scaffold erect', unit: 'm2', default_quantity: null, always_include: true },
+      { line_code: 'scaffold_hire', description: 'Scaffold hire', unit: 'days', default_quantity: 7, always_include: true },
+    ],
+  };
+  const { draft } = ruleDraft('No numbers here', noDefault);
+
+  const erect = line(draft, 'scaffold_erect');
+  assert.equal(erect.quantity_estimate, 1, 'the contract needs a positive quantity');
+  assert.match(erect.note, /Placeholder only/);
+  assert.match(erect.note, /Measure it before sending/);
+
+  const hire = line(draft, 'scaffold_hire');
+  assert.match(hire.note, /template's own figure/, 'a real default is described as one');
+  assert.doesNotMatch(hire.note, /Placeholder/);
+
+  assert.match(draft.flags_for_owner_review.join(' '), /No figure at all for Scaffold erect \(m2\)/);
+  assert.equal(validateDraft(draft, codes(noDefault), {}).ok, true);
+});
+
+test('a line read from the description is never called a placeholder', () => {
+  const { draft } = ruleDraft('About 45 m2, on for five days', SCAFFOLD);
+  assert.doesNotMatch(draft.flags_for_owner_review.join(' '), /No figure at all/);
+  assert.equal(line(draft, 'scaffold_erect').quantity_estimate, 45);
+});

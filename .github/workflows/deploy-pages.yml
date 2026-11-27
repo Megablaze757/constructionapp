@@ -35,7 +35,11 @@ jobs:
           BUSINESS_NAME: ${{ vars.BUSINESS_NAME }}
           BUSINESS_PHONE: ${{ vars.BUSINESS_PHONE }}
         run: |
-          AI_BASE="${AI_BASE:-https://construction.fitnessguru.workers.dev}"
+          # No hardcoded fallback. Pointing the site at an AI worker that is not
+          # configured is worse than pointing it at none: every draft and every
+          # voice note pays a failed round trip before falling back to the free
+          # rung, and the owner reads an error about a worker they never set up.
+          # Set the AI_BASE repository variable when you have one that answers.
           {
             echo "window.BUILDEROS_CONFIG = {"
             echo "  apiBase: '${API_BASE}',"
@@ -44,8 +48,10 @@ jobs:
             echo "  businessPhone: '${BUSINESS_PHONE}',"
             echo "};"
           } > web/config.js
-          if [ -z "$API_BASE" ]; then
-            echo "::notice::API_BASE unset — quotes stay on-device; AI drafts go to ${AI_BASE}."
+          if [ -z "$API_BASE" ] && [ -z "$AI_BASE" ]; then
+            echo "::notice::Neither API_BASE nor AI_BASE set — the site runs on-device, drafts from your wording, and transcribes voice notes in the browser. All free."
+          elif [ -z "$API_BASE" ]; then
+            echo "::notice::API_BASE unset — quotes stay on-device; AI drafting and transcription go to ${AI_BASE}."
           fi
           cat web/config.js
           touch web/.nojekyll

@@ -173,14 +173,23 @@ export function ruleDraft(description, template) {
           : `Read "${hit.raw}" from your description, but more than one line is priced in ${li.unit} — check it is on the right one.`,
       };
     }
+    // A template may have no default on purpose: scaffold m² depends on the
+    // building, so the seeded template stores null rather than a number anyone
+    // could mistake for an estimate. The contract needs a positive quantity, so
+    // it gets 1 — but it is called a placeholder, not a figure, because 1m² of
+    // scaffold prices at £27 and an owner skimming must not read that as the
+    // template's opinion.
+    const hasDefault = Number(li.default_quantity) > 0;
     return {
       line_code: li.line_code,
       description: li.description,
-      quantity_estimate: Number(li.default_quantity) > 0 ? Number(li.default_quantity) : 1,
+      quantity_estimate: hasDefault ? Number(li.default_quantity) : 1,
       unit: li.unit,
       source: 'template_default',
       confidence: 'medium',
-      note: `The template's own figure — your description gave no quantity in ${li.unit}. Check it against the job.`,
+      note: hasDefault
+        ? `The template's own figure — your description gave no quantity in ${li.unit}. Check it against the job.`
+        : `Placeholder only. This template has no default for ${li.unit} because it depends on the building, and your description gave no figure. Measure it before sending.`,
     };
   });
 
@@ -188,6 +197,14 @@ export function ruleDraft(description, template) {
   if (defaulted.length) {
     assumptions.push(
       `${defaulted.length} of ${lineItems.length} quantities are template defaults: ${defaulted.map((l) => l.description).join(', ')}.`,
+    );
+  }
+  // Called out separately, because a placeholder is not a starting number. A
+  // quote left on one is wrong by whatever the real measurement turns out to be.
+  const placeholders = source.filter((li) => !(Number(li.default_quantity) > 0) && !taken.has(li.line_code));
+  if (placeholders.length) {
+    flags.push(
+      `No figure at all for ${placeholders.map((li) => `${li.description} (${li.unit})`).join(', ')} — these are placeholders of 1 and must be measured.`,
     );
   }
   if (taken.size) {

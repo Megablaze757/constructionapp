@@ -387,6 +387,8 @@ function initVoiceNotes() {
   }
 
   const IDLE = '● Hold / Tap to speak quote';
+  const cfg = window.BUILDEROS_CONFIG || {};
+  const aiBase = () => localStorage.getItem('builderos.aiBase') || cfg.aiBase || '';
   let recorder = null;
   let chunks = [];
   let stream = null;
@@ -414,6 +416,15 @@ function initVoiceNotes() {
     btn.classList.add('recording');
     btn.textContent = '🔴 Recording — release to transcribe';
     say('Describe the job out loud. Numbers and units help.');
+
+    // With no AI worker, Whisper on this device is the only transcriber, and its
+    // model is a ~41MB download the first time. Start fetching it now, while
+    // there is someone talking — the wait then costs nothing instead of landing
+    // after they have finished. Nothing is downloaded unless a note is actually
+    // recorded, so a phone on mobile data pays only when it is used.
+    if (!aiBase()) {
+      import('./transcribe.js').then((m) => m.warmUp()).catch(() => {});
+    }
   }
 
   function stop() {
@@ -429,9 +440,8 @@ function initVoiceNotes() {
     btn.innerHTML = '<span class="spinner"></span> Transcribing…';
     try {
       const { transcribe } = await import('./transcribe.js');
-      const cfg = window.BUILDEROS_CONFIG || {};
       const out = await transcribe(blob, {
-        aiBase: localStorage.getItem('builderos.aiBase') || cfg.aiBase || '',
+        aiBase: aiBase(),
         aiToken: localStorage.getItem('builderos.aiToken') || cfg.aiToken || '',
         onStage: (rung) => say(rung === 'groq'
           ? 'Transcribing…'
